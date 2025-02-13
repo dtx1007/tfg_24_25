@@ -1,0 +1,122 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2821
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 JetBrainsMonoNLNF-Regular;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww14980\viewh10200\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs26 \cf0 Diferencias clave:\
+- An\'e1lisis est\'e1tico: intentar detectar si un programa es malicioso sin ejecutarlo, solo usando caracter\'edsitcas que se puedan extraer del binario. Es m\'e1s simple, m\'e1s r\'e1pido y menos costoso.\
+\
+- An\'e1lisis din\'e1mico: intenta detectar si un programa es malicioso ejecut\'e1ndolo y analizando su comportamiento, qu\'e9 acciones realiza, qu\'e9 archivos modifica, tr\'e1fico de red... Es m\'e1s complejo, m\'e1s preciso, permite detectar malware que emplea t\'e9cnicas de ocultamiento, es m\'e1s dificl de implementar y m\'e1s costoso pues requiere de mejor hardware. No es muy apto para dispositivos peque\'f1os.\
+\
+- An\'e1lisis h\'edbrido: mezcla del an\'e1lisis est\'e1tico y din\'e1mico, generalmente, se empieza ejecutando el programa y se van realizando dumps de memoria de manerea peri\'f3dica o cuando se detectan anormalidades en el comportamiento de este. Estos dumps de memoria se analizan mediante t\'e9cnicas est\'e1ticasc para ver si el programa es o no malicioso. Es el m\'e1s complejo de los tres pero suele ofrecer los mejores resultados, es tambi\'e9n el m\'e1s costoso por norma general.\
+\
+La mayor\'eda de antivirus famosos hoy en d\'eda se basan en una mezcla de todos estos an\'e1lisis, siendo el predominante, la realizaci\'f3n de un an\'e1lisis est\'e1tico sobre los ficheros de forma peri\'f3dica, mirando, generalmente, su firma digital (signature) para determinar si es malicioso.\
+\
+Internamente, las empresas de ciberseguridad realizan an\'e1lisis extensivos en diferentes tipos de malware y actualizan sus listas de firmas de manera habitual para mantener a los usuario protegidos, a\'fan as\'ed, existen otros m\'e9todos de detecci\'f3n secundarios, los cuales se emplean en el caso en el que el antivirus no pueda verificar la firma del programa.\
+\
+En dispositivos m\'f3viles, si hablamos de emplear un antivirus, este ha de estar extrem\'e1damente bien optimizado y usar el m\'ednimo n\'famero posible de recursos mientras que garantize la mayor precisi\'f3n posible. Es por ello, por lo que, en dispositivos m\'f3viles, es preferible el uso del an\'e1lisis est\'e1tico frente al din\'e1mico o el h\'edbrido por su simplicidad y eficiencia, manteniendo una buena precisi\'f3n.\
+\
+Conceptos de inter\'e9s:\
+- Fingerprinting: hashear un archivo y comparar con una base de samples. Cualquier cambio da un hash distinto y siempre tienen la misma longitud en funci\'f3n del algoritmo.\
+\
+- Fuzzy hashing: mismo concepto que el hash tradicional pero por bloques, en vez de hashear el archivo entero de una, se hace sobre una porci\'f3n (bloque) de la entrada. Es \'fatil porque permite detectar samples con cambios parciales, se pueden comparar dos fuzzy hasehs facilmente contado los patrones entre cada uno y obtener un grado de similitud.\
+\
+- Andorid manifest: sacar datos acerca de nombres, permisos, intenciones, servicios, actividades...\
+\
+- Analisis de c\'f3digo: llamadas a la API del sistema (syscalls), variables siendo modiifcadas de forma externa o siendo pasadas a una shell o ejecutadas, flujo de datos y de informaci\'f3n, OPCODES, strings en el c\'f3digo (URLs, correos, IPs)...\
+\
+Art\'edculos de inter\'e9s:\
+\
+- https://ieeexplore.ieee.org/abstract/document/9936621 - A Method for Automatic Android Malware Detection Based on Static Analysis and Deep Learning\
+\
+Expone un buen puento y es que muchos an\'e1lisis e investigaciones se basan simplemente en detectar si un sample es maligno o no, pero tmabi\'e9n ser\'eda interesante clasificar el malware seg\'fan su subtipo (worm, ransomware, adware, pup, spyware, ...)\
+\
+Utiliza como caracter\'edsticas, el tama\'f1o del archivo, el fuzzy hash, permisos que pide la app, servicios que usa, secuencias de opcodes y llamadas a la API del sistema u otros.\
+\
+El tama\'f1o del archivo importa mucho en la detecci\'f3n de los samples, la mayoria del malware pesa menos de 5MB.\
+\
+Obtiene la mayor\'eda de los datos del manifest y la decompilaci\'f3n de las clases mediante Androguard (https://github.com/androguard/androguard) y los fuzzy hashes con SSDeep\
+\
+Dataset usado CICMalDroid 2020.\
+\
+Mejor modelo despu\'e9s del suyo propio es de un estudio que usa RandomForest.\
+\
+F1: 99,5% para maligno / benigno\
+    96,0% para la clasificaci\'f3n espec\'edfica del malware o benigno\
+\
+Da muchas referencias a otros papers que investigan diferentes m\'e9todos y modelos de IA para solucionar el problema.\
+\
+- https://www.ijraset.com/best-journal/a-static-approach-for-malware-analysis-a-guide-to-analysis-tools-and-techniques\
+\
+Explicaci\'f3n general del t\'e9rmino malware, tipos de malware y definici\'f3n de an\'e1lisis est\'e1tico.\
+\
+Proporciona definiciones y caracter\'edsticas de los diferentes tipos de an\'e1lisis (est\'e1tico, din\'e1mico e h\'edbrido)\
+\
+Header de un archivo ejecutable para Windows (formato PE) (irrelevante)\
+\
+- https://www.mdpi.com/2079-9292/10/13/1606 - Android Mobile Malware Detection Using Machine Learning: A Systematic Review\
+\
+Conjunto de papers acerca del an\'e1lisis de malaware mediante IA para Andorid.\
+\
+Muchas definiciones y citas \'fatiles, estudios de todo tipo acerca del tema.\
+\
+Android es un sistema operativo basasdo en Linux con muchas m\'e1s capas. Est\'e1 optimizado para dispositivos m\'f3viles, mas agresivo con el hecho de liberar recursos, las aplicaciones tienen clicos de vida mucho m\'e1s complejos para optimizar la liberaci\'f3n de recursos y suspender ciertas apps en segundo plano...\
+\
+Tiene m\'e9todos de seguridad como la separaci\'f3n de permisos, el sandboxing de las aplicaciones, permisos de un uso, quitar permisos tras un tiempo de inactividad, restricciones en segundo plano, almacenamiento separado para cada aplicaci\'f3n y aislado del resto, gesti\'f3n de servicios...\
+\
+Google tambi\'e9n tiene un proceso de review de las aplicaciones que se publican en la playstore y, cuando se descargan tambi\'e9n se utilizan m\'e9todos de an\'e1lisis para intentar prevenir infecciones de aplicciones "oficiales". Desafortunadamente, este proceso puede fallar a menudo, dando lugar a malware estando camuflado entre aplicaciones benignas dentro de la tienda oficial del sistema operativo.\
+\
+Hay muchos m\'e9todos de saltarse estas restricciones, principalmente por hardware, pero, tambi\'e9n aprovechn\'e1ndose de vulnerabildades en el kernel o en las aplicaciones. (se citan diferentes vectores de ataque)\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 {{\NeXTGraphic Pasted Graphic.png \width28740 \height15520 \appleattachmentpadding0 \appleembedtype0 \appleaqc
+}¬}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 {{\NeXTGraphic Pasted Graphic 1.png \width28680 \height14000 \appleattachmentpadding0 \appleembedtype0 \appleaqc
+}¬}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 {{\NeXTGraphic Pasted Graphic 2.png \width22360 \height16560 \appleattachmentpadding0 \appleembedtype0 \appleaqc
+}¬}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 {{\NeXTGraphic Pasted Graphic 3.png \width18520 \height15100 \appleattachmentpadding0 \appleembedtype0 \appleaqc
+}¬}\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+- https://link.springer.com/article/10.1007/s10207-022-00579-6\
+\
+(https://github.com/okokabv/MAPAS)\
+\
+Usan VirusShare (https://virusshare.com/) para obtener samples junto con un dataset propuesto en otro paper \
+\
+Modelo MAPAS que proporciona una buena precisi\'f3n en la detecci\'f3n de malware, mientras que, hace que el programa sea ejecutable en dispositivos m\'f3viles con recursos limitados.\
+\
+Se basa en analizar el \'e1rbol de llamadas de un programa a las diferentes APIs del sistema, procesando este mediante una CNN. Curiosamente, en vez de usar el CNN para clasificar directamente los samples, emplea este para determinar el grado de similitud entre las llamdas del programa y las llamadas de un programa malicioso. Para realizar la clasificaci\'f3n se emplea otro modelo m\'e1s sencillo que simplemente se basa en este grado de similitud.\
+\
+Destaca varios m\'e9todos y estudios para la detecci\'f3n del malware usando t\'e9cnicas de an\'e1lisis est\'e1tico, entre estas, el an\'e1lisis de descripciones de las aplicaciones, de las rese\'f1as, de los opcodes, de los permisos y de las llamadas a la API del sistema. Concluyendo que, el m\'e9todo que mejor permite inferir el comportamiento del programa es el an\'e1lisis de las llamadas de lsistema, pero destaca a su vez, que muchas de estas llamadas pueden ser usadas por aplicaciones benignas tambi\'e9n, lo cual hace que el porcentaje de falsos positivos tambi\'e9n pueda ser muy elevado.\
+\
+Usa Flowdroid para obtener un grafo de las API calls.\
+\
+Utilizan una CNN para encontrar patrones sospechosos dentro del set de datos, aplicando Grad-CAM (Gradient-weighted Class Activation Mapping) para poder extraer los patrones que m\'e1s importan dentro del set de datos. El modelo NO se usa para detectar nada, simplmente sirve para generar un set de secuencias de llamadas sospechosas que luego se usar\'e1n como comparaci\'f3n en la clasificaci\'f3n de cada aplicaci\'f3n individual.\
+\
+El flujo es el siguiente, obtener el grafo de llamadas de la aplicaci\'f3n espec\'edfica y compararlo con el set de datos extraido mediante la CNN usando la similitud de jaccard. Si la similitud es mayor a un n\'famero arbitrario (elegido por ellos tras realizar pruebas) ~0.43\
+\
+Evaluaci\'f3n comparada con usar directamente un modelo de CNN para la detecci\'f3n:\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 {{\NeXTGraphic 1__#$!@%!#__Pasted Graphic.png \width25580 \height3620 \appleattachmentpadding0 \appleembedtype0 \appleaqc
+}¬}\
+\
+- https://link.springer.com/chapter/10.1007/978-3-319-60876-1_12#citeas\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+Art\'edculo que hace un an\'e1lisis y clasificaci\'f3n de varias fuentes que ofrecen malware para Android. Obtiene un gran n\'famero (70 clases) de tipos de malware y una clasificaci\'f3n bastante buena de c\'f3mo se comportan estos diferentes tipos de malware, c\'f3mo se descarga, c\'f3mo actua, si roba o no informaci\'f3n, si persiste en el sistema...\
+\
+\{TODO: buscar si existe un link al dataset que crean y analizan\}\
+}
