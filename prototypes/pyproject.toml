@@ -1,9 +1,6 @@
 [tool.poetry]
-name = "prototypes"
-version = "0.1.0"
-description = ""
+package-mode = false
 authors = ["dtx1007 <148854108+dtx1007@users.noreply.github.com>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
