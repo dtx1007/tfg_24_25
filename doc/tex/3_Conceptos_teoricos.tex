@@ -2,7 +2,44 @@
 
 En esta sección se definen aquellos conceptos que son necesarios conocer para comprender el resto del documento.
 
-TODO: malware, tipos de malware más comunes, métodos de ocultación, definición de alguna herramienta usada...
+% TODO: malware, tipos de malware más comunes, métodos de ocultación, definición de alguna herramienta usada...
+
+\subsection{Clasificador}
+Un clasificador es un modelo o algoritmo que se utiliza para asignar una categoría o etiqueta a un conjunto de datos, basándose en sus características. En el contexto de la inteligencia artificial, el proceso de clasificación implica entrenar un modelo para que aprenda a predecir la clase o categoría correcta de nuevas observaciones, basándose en ejemplos previos conocidos como datos de entrenamiento.
+
+\subsection{Red neuronal (\textit{Neural Network})}
+Una red neuronal artificial es un modelo computacional inspirado en el funcionamiento de las redes neuronales biológicas y el cerebro humano. Este tipo de modelos suponen la base del aprendizaje automático (\textit{deep learning} / \textit{machine learning}) y han transformado radicalmente el campo de la inteligencia artificial en los últimos años debido a su capacidad de reconocer patrones complejos en grandes conjuntos de datos.
+
+Internamente, una red neuronal se compone de capas interconectadas de unidades de procesamiento llamadas neuronas artificiales o perceptrones. Cada neurona puede recibir múltiples señales de entrada, aplicando sobre estas una transformación matemática que las combina, la forma de combinar dichas entradas depende de la función específica usada y un conjunto de pesos ajustables, posteriormente, usando la entrada combinada, se genera una salida a través de otra función matemática no lineal llamada, función de activación. Dependiendo de la aplicación que se le quiera dar al modelo, existen diferentes tipos de redes neuronales que se ajustan mejor a unas tareas u otras. Los tipos principales son: redes \textit{feedforward} para propósitos generales, redes recurrentes (RNN) para el procesamiento de datos secuenciales, redes convolucionales (CNN) para procesamiento de imágenes y visión por ordenador, o, recientemente, modelos de tipo \textit{Transformer} para el procesamiento del lenguaje natural.
+
+La forma en la cual la red aprende se lleva a cabo mediante un algoritmo llamado \textit{backpropagation}, el cual ajusta los parámetros de las diferentes neuronas de manera iterativa para reducir una función de pérdida que mide el error de predicción. Este proceso de ajuste de los pesos se realiza mediante el algoritmo del descenso de gradiente y variaciones de este que intentan predecir el mejor ajuste para reducir la función de pérdida. 
+
+Las aplicaciones de este tipo de modelos se han extendido enormemente en los últimos años y hoy en día se aplican en infinidad de campos para la realización de tareas como el procesamiento y la generación del lenguaje natural, el análisis de imágenes médicas, los sistemas de recomendación, la detección de amenazas cibernéticas y muchas otras.
+
+\subsection{Tokenización}
+Los modelos de inteligencia artificial, en su más puro estado, son modelos matemáticos complejos los cuales consiguen aprender patrones de sus datos de entrada y permiten realizar posteriormente predicciones en base a dichos patrones.
+
+El problema fundamental que esto presenta a la hora de procesar diferentes tipos de datos es principalmente que los modelos matemáticos se basan en el uso de números y la búsqueda de patrones en datos numéricos. Esto implica que si usamos datos que no sean numéricos, como puede ser el texto, caemos en un grave problema puesto que no podemos simplemente aplicar el modelo a este tipo de dato directamente puesto no está preparado para funcionar con el.
+
+Una solución a este problema es emplear el proceso de tokenización, el cual consiste en romper el texto que se obtiene como entrada en unidades más sencillas llamadas tokens que el modelo pueda llegar a entender posteriormente. Este proceso puede realizarse de diferentes manearas, ya sea partiendo cada palabra en un token individual, partiendo las palabras en subpalabras o incluso procesando cada carácter de manera independiente.
+
+El proceso de tokenización parece bastante trivial a primera vista pero presenta muchos retos como pueden ser los siguientes. Procesar diferentes idiomas se vuelve rápidamente un problema en función del método que se utilice para obtener los tokens, diferentes idiomas permiten contracciones o expresiones especiales las cuales pueden ser interpretadas de diferentes maneras y han de poder ser divididas en tokens que mantengan dicho significado. También es posible que un texto presente errores gramaticales, símbolos especiales o jerga específica de un campo que ha de ser entendida y tokenizada correctamente para mantener su significado.
+
+\subsection{Vocabulario}
+Para que un modelo pueda entender los tokens que se obtienen en el paso de la tokenización, es necesario convertir dichos tokens en números de alguna forma. Esto puede realizarse de forma sencilla mediante el uso de un diccionario o vocabulario para el modelo.
+
+El vocabulario del modelo no es más que la colección de todos los tokens que se pretende que el modelo pueda comprender asociados a un valor numérico que siempre será el mismo. De esta forma, el texto de entrada puede ser dividido en tokens, los cuales, a su vez, pueden ser convertidos siempre en el mismo valor numérico mediante el uso de un diccionario. Permitiendo así que el modelo procese texto y pueda encontrar patrones en este.
+
+De forma similar al proceso de la tokenización, la creación y selección de un vocabulario presenta muchos problemas que pueden no ser tan aparentes a primera vista, algunos de ellos son, la extensión del diccionario y el número de tokens que son necesarios en este para poder procesar diferentes idiomas o, la necesidad de poder incluir valores de control que puedan ser usados en casos en los que un token no exista o se le quiera dar una información especial a ciertos tokens en algunas circunstancias.
+
+\subsection{\textit{Framework} web}
+Un \textit{framework} web es un conjunto de herramientas, bibliotecas y componentes predefinidos que facilitan el desarrollo de aplicaciones y páginas web. Su propósito es ofrecer una estructura básica que los desarrolladores pueden utilizar para crear aplicaciones de manera más eficiente, sin tener que comenzar desde cero. Los \textit{frameworks} web incluyen funcionalidades que resuelven tareas comunes, como el manejo de rutas (URLs), la conexión a bases de datos, la autenticación de usuarios y la seguridad, lo que ahorra tiempo y esfuerzo durante el desarrollo.
+
+Además, proporcionan una organización estructurada para el código, lo que facilita la colaboración entre desarrolladores y simplifica el mantenimiento de los proyectos a largo plazo. Muchos \textit{frameworks} también incluyen mecanismos de seguridad incorporados para proteger las aplicaciones contra amenazas comunes y herramientas que automatizan tareas repetitivas, como la gestión de dependencias y la ejecución de pruebas. Todo esto permite construir aplicaciones web escalables, seguras y fáciles de mantener.
+
+% TODO: Sería necesario incluir ejemplos? Aquí y en otros apartados también sería aplicable.
+
+Algunos \textit{frameworks} web populares son: Django (para Python), Ruby on Rails (para Ruby), Angular y React (para JavaScript), y Laravel (para PHP).
 
 \subsection{\textit{Malware}}
 El término \textit{malware}, (proveniente de \textit{malicious software}) o software malicioso, se refiere a cualquier programa, código o script diseñado con el propósito explícito de causar daño, comprometer la seguridad, o realizar actividades no autorizadas en un sistema informático, una red o un dispositivo. Coloquialmente, se utiliza el término \textit{malware} para referirse a una amplia gama de diferentes subcategorías de programas que puedan considerarse dañinos, cada una con características, formas de ataque y objetivos específicos, pero todas compartiendo la intención de perjudicar al usuario, robar información, o tomar el control de aquellos sistemas afectados.
