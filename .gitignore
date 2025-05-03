@@ -1,4 +1,6 @@
 dataset/
+prototypes/*_models/*
+**.csv
 
 ### Python .gitignore template (https://github.com/github/gitignore/blob/main/Python.gitignore)
 # Byte-compiled / optimized / DLL files
