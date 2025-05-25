@@ -1,2 +1,5 @@
 **test*
 model_artifacts/
+.env
+/apks
+/dataset

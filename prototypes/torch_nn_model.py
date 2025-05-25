@@ -95,9 +95,7 @@ def preprocess_dataframe(df: pd.DataFrame, feature_names: list[str]) -> pd.DataF
 
 
 def create_vocab_for_column(
-    df: pd.DataFrame, 
-    col: str, 
-    specials: list[str] = ["<PAD>", "<UNK>", "<EMPTY>"]
+    df: pd.DataFrame, col: str, specials: list[str] = ["<PAD>", "<UNK>", "<EMPTY>"]
 ) -> Vocab:
     """
     Create a vocabulary for a specific column in the dataframe.
@@ -128,10 +126,10 @@ def create_vocab_for_column(
 class DebrimDataset(Dataset):
     """
     PyTorch Dataset for the Debrim malware detection data.
-    
+
     This dataset handles both categorical features (using vocabulary mappings)
     and scalar/numerical features.
-    
+
     Parameters
     ----------
     df : pd.DataFrame
@@ -143,6 +141,7 @@ class DebrimDataset(Dataset):
     label_col : str
         Name of the column containing the target labels
     """
+
     def __init__(self, df, vocab_dict, scalar_cols, label_col):
         self.df = df
         self.vocab_dict = vocab_dict
@@ -206,8 +205,7 @@ def collate_fn(
 
     # Stack scalar features and labels
     stacked_scalars = {
-        col: torch.stack([s[col] for s in scalars]) 
-        for col in scalars[0].keys()
+        col: torch.stack([s[col] for s in scalars]) for col in scalars[0].keys()
     }
 
     stacked_labels = torch.stack(labels)
@@ -282,42 +280,52 @@ class DebrimEmbedder(nn.Module):
             - scalars: passed through scalar features (unchanged)
         """
         pooled_embeddings = []
-        
+
         for feature_name, sequence in seq_feats.items():
             # Get embeddings for this feature [batch_size, seq_length, embedding_dim]
             embeddings = self.embedders[feature_name](sequence)
-            
+
             # Create padding mask (1 for actual tokens, 0 for padding)
             padding_mask = (sequence != 0).unsqueeze(-1)  # [batch_size, seq_length, 1]
-            
+
             if self.seq_pooling == "mean":
                 # Mean pooling - average embeddings while ignoring padding
                 # Sum the embeddings, masking out padding tokens
-                summed = (embeddings * padding_mask).sum(dim=1)  # [batch_size, embedding_dim]
+                summed = (embeddings * padding_mask).sum(
+                    dim=1
+                )  # [batch_size, embedding_dim]
                 # Count non-padding tokens (at least 1 to avoid division by zero)
                 token_counts = padding_mask.sum(dim=1).clamp(min=1)
                 # Compute mean by dividing sum by token count
-                pooled_embeddings.append(summed / token_counts)  # [batch_size, embedding_dim]
+                pooled_embeddings.append(
+                    summed / token_counts
+                )  # [batch_size, embedding_dim]
             else:
                 # Max pooling - take maximum value for each dimension
                 # Replace padding embeddings with -inf so they don't affect max
-                masked_embeddings = embeddings.masked_fill(sequence.unsqueeze(-1) == 0, float("-inf"))
+                masked_embeddings = embeddings.masked_fill(
+                    sequence.unsqueeze(-1) == 0, float("-inf")
+                )
                 # Get maximum values across sequence length dimension
-                pooled_embeddings.append(masked_embeddings.max(dim=1).values)  # [batch_size, embedding_dim]
+                pooled_embeddings.append(
+                    masked_embeddings.max(dim=1).values
+                )  # [batch_size, embedding_dim]
 
         # Concatenate all pooled embeddings for all features
-        concatenated_embeddings = torch.cat(pooled_embeddings, dim=1)  # [batch_size, total_embedding_dim]
-        
+        concatenated_embeddings = torch.cat(
+            pooled_embeddings, dim=1
+        )  # [batch_size, total_embedding_dim]
+
         return concatenated_embeddings, scalars
 
 
 class DebrimClassifier(nn.Module):
     """
     MLP classifier head for the Debrim model.
-    
-    A multi-layer perceptron (MLP) classifier that processes the embedded features 
+
+    A multi-layer perceptron (MLP) classifier that processes the embedded features
     and produces class probabilities for malware detection.
-    
+
     Parameters
     ----------
     input_dim : int
@@ -346,7 +354,7 @@ class DebrimClassifier(nn.Module):
         # Construct MLP layers with activation and dropout
         layers = []
         layer_dimensions = [input_dim] + hidden_dims
-        
+
         # Create hidden layers with ReLU activation and dropout
         for input_dim, output_dim in zip(layer_dimensions, layer_dimensions[1:]):
             layers.append(nn.Linear(input_dim, output_dim))
@@ -355,7 +363,7 @@ class DebrimClassifier(nn.Module):
 
         # Add final output layer (no activation - will be applied in loss function)
         layers.append(nn.Linear(layer_dimensions[-1], n_classes))
-        
+
         # Combine all layers into a sequential model
         self.mlp = nn.Sequential(*layers)
 
@@ -379,10 +387,10 @@ class DebrimClassifier(nn.Module):
 class DebrimModel(nn.Module):
     """
     Complete Debrim model combining embedder and classifier components.
-    
+
     This model integrates feature embedding and classification components into
     a complete end-to-end architecture for malware detection.
-    
+
     Parameters
     ----------
     embedder : DebrimEmbedder
@@ -408,10 +416,10 @@ class DebrimModel(nn.Module):
         if classifier is None:
             total_input_dim = embedder.output_dim + scalar_dim
             self.classifier = DebrimClassifier(
-                input_dim=total_input_dim, 
-                hidden_dims=[128, 64], 
-                n_classes=2, 
-                dropout=0.5
+                input_dim=total_input_dim,
+                hidden_dims=[128, 64],
+                n_classes=2,
+                dropout=0.5,
             )
         else:
             self.classifier = classifier
@@ -454,14 +462,12 @@ class DebrimModel(nn.Module):
         """
         # Create embedder component with specified parameters
         embedder = DebrimEmbedder(
-            vocab_dict=vocab_dict, 
-            embedding_dim=embedding_dim, 
-            seq_pooling=seq_pooling
+            vocab_dict=vocab_dict, embedding_dim=embedding_dim, seq_pooling=seq_pooling
         )
 
         # Calculate total input dimension for classifier
         total_input_dim = embedder.output_dim + scalar_dim
-        
+
         # Create classifier component with specified parameters
         classifier = DebrimClassifier(
             input_dim=total_input_dim,
@@ -496,7 +502,7 @@ class DebrimModel(nn.Module):
         if self.scalar_dim > 0 and scalars:
             # Convert scalar features dictionary to a list of tensors
             scalar_tensors = [scalars[col] for col in scalars]
-            
+
             if scalar_tensors:
                 # Concatenate scalar features into a single tensor
                 scalar_tensor = torch.cat(scalar_tensors, dim=1)
@@ -514,7 +520,7 @@ class DebrimModel(nn.Module):
 def get_best_available_device() -> torch.device:
     """
     Detect and return the best available device for PyTorch computation.
-    
+
     This function checks for hardware acceleration in the following order:
     1. NVIDIA CUDA GPUs
     2. Apple Metal Performance Shaders (M-series chips)
@@ -582,17 +588,11 @@ def train_nn_model(
     """
     # Create dataset and data loader for training
     dataset = DebrimDataset(
-        df, 
-        vocab_dict, 
-        scalar_cols=scalar_cols, 
-        label_col=hyperparams.label_col
+        df, vocab_dict, scalar_cols=scalar_cols, label_col=hyperparams.label_col
     )
-    
+
     data_loader = DataLoader(
-        dataset, 
-        batch_size=hyperparams.batch_size, 
-        shuffle=True, 
-        collate_fn=collate_fn
+        dataset, batch_size=hyperparams.batch_size, shuffle=True, collate_fn=collate_fn
     )
 
     # Initialize model with configuration from hyperparameters
@@ -652,7 +652,7 @@ def train_nn_model(
 
     for epoch in range(hyperparams.epochs):
         epoch_loss = 0.0
-        
+
         # Process batches
         for seq_feats, scalars, labels in data_loader:
             # Move batch data to the selected device
@@ -664,11 +664,11 @@ def train_nn_model(
             optimizer.zero_grad()
             logits = model(seq_feats, scalars)
             loss = criterion(logits, labels)
-            
+
             # Backward pass and optimization
             loss.backward()
             optimizer.step()
-            
+
             epoch_loss += loss.item()
 
         # Calculate average loss for the epoch
