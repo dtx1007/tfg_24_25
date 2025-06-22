@@ -520,6 +520,9 @@ class DebrimModel(nn.Module):
         self.embedder = embedder
         self.scalar_dim = scalar_dim
 
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
+
         # If no classifier is provided, create a default one with standard parameters
         if classifier is None:
             total_input_dim = embedder.output_dim + scalar_dim
@@ -614,7 +617,11 @@ class DebrimModel(nn.Module):
             combined_features = embeddings
 
         # Pass through classifier to get output logits
-        return self.classifier(combined_features)
+        quantized_features = self.quant(combined_features)
+        quantized_logits = self.classifier(quantized_features)
+        logits = self.dequant(quantized_logits)
+
+        return logits
 
 
 def get_best_available_device() -> torch.device:
@@ -1654,6 +1661,9 @@ def evaluate_model_on_test_set(
     all_preds_test = []
     all_probs_test = []
 
+    # measure iference time
+
+    inference_start_time = time.time()
     with torch.no_grad():
         for seq_feats, char_feats, vector_feats, scalars, labels in test_loader:
             seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
@@ -1670,6 +1680,7 @@ def evaluate_model_on_test_set(
             all_labels_test.extend(labels.cpu().tolist())
             all_preds_test.extend(preds.cpu().tolist())
             all_probs_test.extend(probs.cpu().tolist())
+    inference_time = time.time() - inference_start_time
 
     # Calculate metrics
     y_true = np.array(all_labels_test)
@@ -1696,6 +1707,7 @@ def evaluate_model_on_test_set(
         "classification_report": classification_report(
             y_true, y_pred, output_dict=True, zero_division=0
         ),
+        "inference_time": inference_time,
     }
     if len(np.unique(y_true)) > 1:
         test_metrics["roc_auc"] = roc_auc_score(y_true, y_prob)
@@ -1705,6 +1717,7 @@ def evaluate_model_on_test_set(
         test_metrics["pr_auc"] = np.nan
 
     print("\n--- Test Set Evaluation Metrics ---")
+    print(f"  Inference Time: {test_metrics['inference_time']:.2f} seconds")
     for metric_name, metric_value in test_metrics.items():
         if isinstance(metric_value, float) or isinstance(metric_value, int):
             print(f"  {metric_name.replace('_', ' ').capitalize()}: {metric_value:.4f}")
