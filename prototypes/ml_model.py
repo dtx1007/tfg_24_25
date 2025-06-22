@@ -1,7 +1,30 @@
+import os
+import pickle
+import tempfile
+import time
 import numpy as np
+import xgboost as xgb
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Literal, Any
+
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.metrics import (
+    accuracy_score,
+    precision_recall_curve,
+    auc,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    roc_curve,
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +69,8 @@ class MLHyperparams:
         Column subsample ratio for XGBoost
     random_state : int
         Seed for reproducibility
+    verbose : bool
+        Whether to print verbose output during model training
     """
 
     model_type: Literal[
@@ -85,6 +110,9 @@ class MLHyperparams:
     # Logistic Regression parameters
     solver: Literal["newton-cg", "lbfgs", "liblinear", "sag", "saga"] = "lbfgs"
 
+    # Verbose output for some models
+    verbose: bool = False
+
     def create_model(self) -> Any:
         """
         Create and return a machine learning model based on the hyperparameters.
@@ -94,13 +122,6 @@ class MLHyperparams:
         model : sklearn estimator
             The initialized model according to the specified hyperparameters
         """
-        from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-        from sklearn.svm import SVC
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.naive_bayes import GaussianNB
-        from sklearn.neighbors import KNeighborsClassifier
-        from sklearn.tree import DecisionTreeClassifier
-        import xgboost as xgb
 
         match self.model_type:
             case "random_forest":
@@ -111,6 +132,7 @@ class MLHyperparams:
                     min_samples_leaf=self.min_samples_leaf,
                     class_weight=self.class_weight,
                     random_state=self.random_state,
+                    verbose=self.verbose,
                 )
             case "gradient_boosting":
                 return GradientBoostingClassifier(
@@ -119,6 +141,7 @@ class MLHyperparams:
                     min_samples_split=self.min_samples_split,
                     min_samples_leaf=self.min_samples_leaf,
                     random_state=self.random_state,
+                    verbose=self.verbose,
                 )
             case "decision_tree":
                 return DecisionTreeClassifier(
@@ -150,6 +173,7 @@ class MLHyperparams:
                     probability=self.probability,
                     class_weight=self.class_weight,
                     random_state=self.random_state,
+                    verbose=self.verbose,
                 )
             case "logistic_regression":
                 return LogisticRegression(
@@ -157,6 +181,7 @@ class MLHyperparams:
                     class_weight=self.class_weight,
                     solver=self.solver,
                     random_state=self.random_state,
+                    verbose=self.verbose,
                 )
             case "naive_bayes":
                 return GaussianNB()
@@ -212,22 +237,6 @@ def train_classical_models_cv(
         - results: Nested dictionary containing evaluation results for each model
         - best_models: Dictionary mapping model names to their best performing instances
     """
-    from sklearn.metrics import (
-        accuracy_score,
-        precision_recall_curve,
-        auc,
-        precision_score,
-        recall_score,
-        f1_score,
-        confusion_matrix,
-        roc_curve,
-    )
-    from sklearn.model_selection import RepeatedStratifiedKFold
-    import os
-    import pickle
-    import tempfile
-    import time
-    from dataclasses import asdict
 
     # Validate inputs
     if X is None or y is None:
@@ -378,7 +387,7 @@ def train_classical_models_cv(
             results[model_name]["training_time"].append(training_time)
 
             print(
-                f"  {model_name}: F1={f1:.4f}, Accuracy={accuracy:.4f}, Size={model_size_kb:.1f}KB, Time={training_time:.2f}s"
+                f"  {model_name}: Acc={accuracy:.4f}, P: {precision:.4f}, R: {recall:.4f}, F1: {f1:.4f}, ROC: {roc_auc_score:.4f}, PR: {pr_auc_score:.4f}, Size={model_size_kb:.1f}KB, Time={training_time:.2f}s"
             )
 
             # Track best model based on scoring metric

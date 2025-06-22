@@ -2,7 +2,9 @@ import os
 import json
 import torch
 import pickle
+import joblib
 import numpy as np
+
 from dataclasses import asdict
 from datetime import datetime
 
@@ -17,6 +19,8 @@ from torchtext.vocab import Vocab
 
 from typing import Any
 from pathlib import Path
+
+from sklearn.preprocessing import StandardScaler
 
 
 def _convert_numpy_to_list(data: Any) -> Any:
@@ -39,11 +43,12 @@ def save_model_with_metadata(
     model: DebrimModel,
     vocab_dict: dict[str, Vocab],
     hyperparams: NNHyperparams,
+    scalers: dict[str, StandardScaler],
     results: dict[str, Any] | None = None,
     save_dir: Path | str = "./model_artifacts/nn_models",
 ) -> dict[str, str]:
     """
-    Save a trained neural network model with all its components and metadata.
+    Save a trained neural network model with all its components, metadata, and scalers.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_dir = os.path.join(save_dir, timestamp)
@@ -55,6 +60,7 @@ def save_model_with_metadata(
         "embedder": os.path.join(model_dir, "debrim_embedder.pt"),
         "classifier": os.path.join(model_dir, "debrim_classifier.pt"),
         "vocab": os.path.join(model_dir, "vocab_dict.pkl"),
+        "scalers": os.path.join(model_dir, "scalers.joblib"),
         "hyperparams": os.path.join(model_dir, "hyperparams.json"),
         "metadata": os.path.join(model_dir, "metadata.json"),
         "summary_metrics": os.path.join(model_dir, "summary_metrics.json"),
@@ -67,6 +73,9 @@ def save_model_with_metadata(
 
     with open(paths["vocab"], "wb") as f:
         pickle.dump(vocab_dict, f)
+
+    joblib.dump(scalers, paths["scalers"])
+    print(f"Scalers saved to {paths['scalers']}")
 
     if isinstance(hyperparams, dict):
         hyperparams_dict = hyperparams
@@ -99,17 +108,20 @@ def save_model_with_metadata(
         json.dump(metadata, f, indent=2)
 
     if results:
-        summary_metrics = {}
-        all_metrics = {}
+        all_metrics = _convert_numpy_to_list(results)
 
-        for metric_name, metric_value in results.items():
-            if metric_name.startswith("mean_") or metric_name.startswith("std_"):
-                summary_metrics[metric_name] = metric_value
+        # Create the 'summary_metrics' dict by extracting mean_ and std_ keys for CV results,
+        # or by using the 'final_metrics_best_model' for single-run results.
+        summary_metrics = {
+            key: value
+            for key, value in all_metrics.items()
+            if key.startswith("mean_") or key.startswith("std_")
+        }
 
-            if metric_name != "hyperparams":
-                all_metrics[metric_name] = metric_value
+        # If no mean/std keys were found, it's likely a single run, so use its final metrics.
+        if not summary_metrics and "final_metrics_best_model" in all_metrics:
+            summary_metrics = all_metrics["final_metrics_best_model"]
 
-        all_metrics = _convert_numpy_to_list(all_metrics)
         with open(paths["summary_metrics"], "w") as f:
             json.dump(summary_metrics, f, indent=2)
 
@@ -120,7 +132,6 @@ def save_model_with_metadata(
     with open(version_file, "w") as f:
         f.write(timestamp)
 
-    print(f"Model architecture: {model.state_dict()}")
     print(f"Model and artifacts saved to {model_dir}")
     return paths
 
@@ -222,9 +233,13 @@ def load_debrim_model_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimModel, dict[str, Vocab], dict[str, Any]]:
+) -> tuple[DebrimModel, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]]:
     """
-    Load a complete DebrimModel from a specific version directory.
+    Load a complete DebrimModel, its vocabulary, scalers, and metadata from a specific version directory.
+    Returns:
+    --------
+    tuple
+        (model, vocab_dict, scalers, metadata)
     """
     if device is None:
         device = get_best_available_device()
@@ -232,6 +247,7 @@ def load_debrim_model_from_version(
     model_dir = _resolve_model_directory(version, base_dir)
     model_path = os.path.join(model_dir, "debrim_model.pt")
     vocab_path = os.path.join(model_dir, "vocab_dict.pkl")
+    scalers_path = os.path.join(model_dir, "scalers.joblib")  # Path for scalers
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -241,6 +257,16 @@ def load_debrim_model_from_version(
     with open(vocab_path, "rb") as f:
         vocab_dict = pickle.load(f)
 
+    if not os.path.exists(scalers_path):
+        raise FileNotFoundError(
+            f"Scalers file not found at {scalers_path}. Model cannot be loaded without its scalers."
+        )
+    try:
+        loaded_scalers = joblib.load(scalers_path)
+        print(f"Scalers loaded from {scalers_path}")
+    except Exception as e:
+        raise IOError(f"Could not load scalers from {scalers_path}. Error: {e}")
+
     metadata = _load_model_metadata(model_dir)
     hyperparams = metadata.get("hyperparameters", {})
     model_arch = metadata.get("model_architecture", {})
@@ -248,7 +274,9 @@ def load_debrim_model_from_version(
     # Extract configuration parameters with defaults
     embedding_dim = hyperparams.get("embedding_dim", 128)
     seq_pooling = hyperparams.get("seq_pooling", "mean")
-    hidden_dim = hyperparams.get("hidden_dims", [128, 64])
+    hidden_dim = hyperparams.get(
+        "hidden_dims", [128, 64]
+    )  # Ensure this key matches NNHyperparams
     n_classes = hyperparams.get("n_classes", 2)
     dropout = hyperparams.get("dropout", 0.5)
 
@@ -258,14 +286,20 @@ def load_debrim_model_from_version(
     vector_cols = model_arch.get("vector_cols", [])
     vector_dims = model_arch.get("vector_dims", {})
 
-    # Extract scalar information
+    # Determine scalar_cols list for from_config based on scalar_dim
+    # The actual names are not stored with the model, only the count.
+    # For model re-instantiation, we only need the count for the classifier's input_dim.
+    # The actual scalar column names would be needed by the user when preparing data.
     scalar_dim = model_arch.get("scalar_features", 0)
+    # Create a placeholder list for scalar_cols for from_config
+    # The actual names are not strictly needed for model instantiation if only count is used for input_dim
+    instantiation_scalar_cols = [f"scalar_{i}" for i in range(scalar_dim)]
 
     # Create model with the right architecture including new parameters
     model = DebrimModel.from_config(
         vocab_dict=vocab_dict,
         sequence_cols=sequence_cols,
-        scalar_cols=[None] * scalar_dim,
+        scalar_cols=instantiation_scalar_cols,  # Pass the list of placeholder names
         char_cols=char_cols,
         vector_cols=vector_cols,
         vector_dims=vector_dims,
@@ -282,16 +316,16 @@ def load_debrim_model_from_version(
     model.eval()
 
     print(f"Model loaded from {model_dir}")
-    return model, vocab_dict, metadata
+    return model, vocab_dict, loaded_scalers, metadata
 
 
 def load_debrim_embedder_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimEmbedder, dict[str, Vocab], dict[str, Any]]:
+) -> tuple[DebrimEmbedder, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]]:
     """
-    Load only the embedder component from a specific version directory.
+    Load only the embedder component, vocab, scalers (if present), and metadata from a specific version directory.
     """
     if device is None:
         device = get_best_available_device()
@@ -299,6 +333,7 @@ def load_debrim_embedder_from_version(
     model_dir = _resolve_model_directory(version, base_dir)
     embedder_path = os.path.join(model_dir, "debrim_embedder.pt")
     vocab_path = os.path.join(model_dir, "vocab_dict.pkl")
+    scalers_path = os.path.join(model_dir, "scalers.joblib")
 
     if not os.path.exists(embedder_path):
         raise FileNotFoundError(f"Embedder file not found: {embedder_path}")
@@ -307,6 +342,18 @@ def load_debrim_embedder_from_version(
 
     with open(vocab_path, "rb") as f:
         vocab_dict = pickle.load(f)
+
+    if not os.path.exists(scalers_path):
+        raise FileNotFoundError(
+            f"Scalers file not found at {scalers_path}. Cannot proceed without scalers."
+        )
+    try:
+        loaded_scalers = joblib.load(scalers_path)
+        print(
+            f"Scalers loaded from {scalers_path} (for context, though embedder doesn't use them directly)"
+        )
+    except Exception as e:
+        raise IOError(f"Could not load scalers from {scalers_path}. Error: {e}")
 
     metadata = _load_model_metadata(model_dir)
     hyperparams = metadata.get("hyperparameters", {})
@@ -339,4 +386,4 @@ def load_debrim_embedder_from_version(
     embedder.eval()
 
     print(f"Embedder loaded from {model_dir}")
-    return embedder, vocab_dict, metadata
+    return embedder, vocab_dict, loaded_scalers, metadata

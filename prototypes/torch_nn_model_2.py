@@ -1,18 +1,41 @@
+import platform
+import tempfile
+import os
+import time
+import copy
+import gc
 import numpy as np
 import pandas as pd
 
 import torch
 import torch.nn as nn
-from torchtext.vocab import build_vocab_from_iterator
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
 import torch.optim as optim
-from torch.profiler import profile, record_function, ProfilerActivity
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torchtext.vocab.vocab import Vocab
+from torch.cuda.amp import GradScaler, autocast
 
 from dataclasses import dataclass, field
 from typing import Literal, Self, Any
 
-from torchtext.vocab.vocab import Vocab
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import RepeatedStratifiedKFold, train_test_split
+from sklearn.utils.class_weight import compute_class_weight
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    average_precision_score,
+    recall_score,
+    auc,
+    confusion_matrix,
+    precision_recall_curve,
+    roc_curve,
+    roc_auc_score,
+    classification_report,
+)
+
+from preprocessing_utils import apply_scalers_to_dataframe
 
 
 @dataclass(frozen=True)
@@ -24,8 +47,9 @@ class NNHyperparams:
     ----------
     batch_size : int
         Number of samples per batch during training
-    learning_rate : float
-        Step size for optimizer updates
+    max_learning_rate : float
+        Maximum learning rate for the learning rate scheduler; represents
+        step size for the optimizer
     epochs : int
         Maximum number of complete passes through the training dataset
     early_stopping : bool
@@ -48,10 +72,18 @@ class NNHyperparams:
         Number of classes for classification
     label_col : str
         Name of the column containing target labels
+    dataloader_num_workers : int
+        Number of subprocesses to use for data loading
+    dataloader_pin_memory : bool
+        Whether to pin memory for faster data transfer to GPU
+    dataloader_persistent_workers : bool
+        Whether to keep workers alive after the first epoch
+    grad_scaler_max_norm : float
+        Maximum norm for gradient scaling to prevent exploding gradients
     """
 
     batch_size: int = 64
-    learning_rate: float = 1e-3
+    max_learning_rate: float = 1e-3
     epochs: int = 10
     early_stopping: bool = True
     patience: int = 5
@@ -64,106 +96,11 @@ class NNHyperparams:
     n_classes: int = 2
     label_col: str = "malware"
 
+    dataloader_num_workers: int = 0
+    dataloader_pin_memory: bool = True
+    dataloader_persistent_workers: bool = False
 
-def preprocess_dataframe(df: pd.DataFrame, feature_names: list[str]) -> pd.DataFrame:
-    """
-    Preprocess dataframe for model input.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing the data to be preprocessed
-    feature_names : list of str
-        List of feature names to be processed
-
-    Returns
-    -------
-    pd.DataFrame
-        Preprocessed DataFrame with features converted to appropriate types
-    """
-    # Handle missing values
-    df = df.replace(np.nan, "")
-
-    # Detect list-based columns (comma-separated strings)
-    list_features = []
-    for col in feature_names:
-        if col.endswith("_list") and col in df.columns:
-            list_features.append(col)
-
-    # Convert comma-separated strings to lists for list features
-    df = df.assign(
-        **{col: df[col].str.split(",") for col in list_features if col in df.columns}
-    )
-    df = df.assign(
-        **{
-            col: df[col].apply(lambda x: [f for f in x if f and f.strip() != ""])
-            for col in list_features
-            if col in df.columns
-        }
-    )
-
-    # Ensure file_size is numeric
-    if "file_size" in df.columns:
-        df["file_size"] = pd.to_numeric(df["file_size"], errors="coerce").fillna(0)
-
-    return df
-
-
-def create_vocab_for_column(
-    df: pd.DataFrame, col: str, specials: list[str] = ["<PAD>", "<UNK>", "<EMPTY>"]
-) -> Vocab:
-    """
-    Create a vocabulary for a specific column in the dataframe.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The dataframe containing the data.
-    col : str
-        The column name for which to create the vocabulary.
-    specials : list
-        List of special tokens to include in the vocabulary.
-
-    Returns
-    -------
-    vocab : torchtext.vocab.Vocab
-        The vocabulary object mapping tokens to indices.
-    """
-
-    all_tokens = [token for token_list in df[col] for token in token_list]
-
-    # Build vocabulary from all tokens
-    vocab = build_vocab_from_iterator([all_tokens], specials=specials)
-    # Set the default index for unknown tokens
-    vocab.set_default_index(vocab["<UNK>"])
-    return vocab
-
-
-def create_char_vocab(
-    char_set: set[str], specials: list[str] = ["<PAD>", "<UNK>", "<EMPTY>"]
-) -> Vocab:
-    """
-    Create a character-level vocabulary from a set of characters.
-    Parameters
-    ----------
-    char_set : set[str]
-        Set of characters to include in the vocabulary.
-    specials : list
-
-        List of special tokens to include in the vocabulary.
-    Returns
-    -------
-    vocab : torchtext.vocab.Vocab
-        The vocabulary object mapping characters to indices.
-    """
-
-    # Create a vocabulary from the character set
-    vocab = build_vocab_from_iterator(
-        [[c] for c in char_set], specials=specials, min_freq=1
-    )
-    # Set the default index for unknown characters
-    vocab.set_default_index(vocab["<UNK>"])
-    return vocab
+    grad_scaler_max_norm: float = 1.0
 
 
 class DebrimDataset(Dataset):
@@ -173,62 +110,92 @@ class DebrimDataset(Dataset):
 
     def __init__(
         self,
-        df,
-        vocab_dict,
+        df: pd.DataFrame,
         sequence_cols=None,
         scalar_cols=None,
         char_cols=None,
         vector_cols=None,
         label_col="is_malware",
     ):
-        self.df = df
-        self.vocab_dict = vocab_dict
-        self.sequence_cols = sequence_cols or []  # Regular sequence features
-        self.scalar_cols = scalar_cols or []  # Numeric scalar features
-        self.char_cols = char_cols or []  # Character-level features
-        self.vector_cols = vector_cols or []  # Fixed-length vector features
+        self.sequence_cols = sequence_cols or []
+        self.scalar_cols = scalar_cols or []
+        self.char_cols = char_cols or []
+        self.vector_cols = vector_cols or []
         self.label_col = label_col
 
+        # Extract necessary data into lists to reduce memory per worker
+        self.processed_seq_features = {}
+        for col in self.sequence_cols:
+            if col in df.columns:
+                self.processed_seq_features[col] = np.array(
+                    df[col].tolist(), dtype=np.int32
+                )
+
+        self.processed_char_features = {}
+        for col in self.char_cols:
+            if col in df.columns:
+                self.processed_char_features[col] = np.array(
+                    df[col].tolist(), dtype=np.int32
+                )
+
+        self.processed_vector_features = {}
+        for col in self.vector_cols:
+            if col in df.columns:
+                self.processed_vector_features[col] = np.array(
+                    df[col].tolist(), dtype=np.float32
+                )
+
+        self.processed_scalars = {}
+        for col in self.scalar_cols:
+            if col in df.columns:
+                # Scalars are single numbers, tolist() will create a list of these numbers
+                self.processed_scalars[col] = df[col].to_numpy(dtype=np.float32)
+
+        if self.label_col in df.columns:
+            self.labels = df[self.label_col].to_numpy(dtype=np.int64)
+        else:
+            # Handle missing label column if necessary, e.g., for prediction without labels
+            self.labels = [0] * len(df)  # Or raise error, or handle appropriately
+            print(
+                f"Warning: Label column '{self.label_col}' not found in DataFrame. Using dummy labels."
+            )
+
+        self._length = len(df)
+
     def __len__(self):
-        return len(self.df)
+        return self._length
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
+        seq_features = {
+            col: torch.tensor(self.processed_seq_features[col][idx], dtype=torch.long)
+            for col in self.sequence_cols
+            if col in self.processed_seq_features  # Check if key exists
+        }
 
-        # Process standard sequence features (explicitly using sequence_cols)
-        seq_features = {}
-        for col in self.sequence_cols:
-            if col in row.index:
-                stoi = self.vocab_dict[col].get_stoi()
-                indices = [stoi.get(token, stoi["<UNK>"]) for token in row[col]]
-                seq_features[col] = torch.tensor(indices, dtype=torch.long)
-
-        # Process character-level features
         char_features = {
-            col: torch.tensor(row[col], dtype=torch.long)
+            col: torch.tensor(self.processed_char_features[col][idx], dtype=torch.long)
             for col in self.char_cols
-            if col in row.index
+            if col in self.processed_char_features
         }
 
-        # Process vector features (no type checks or filtering necessary)
         vector_features = {
-            col: torch.tensor(row[col], dtype=torch.float)
+            col: torch.tensor(
+                self.processed_vector_features[col][idx], dtype=torch.float
+            )
             for col in self.vector_cols
-            if col in row.index
+            if col in self.processed_vector_features
         }
 
-        # Process scalar features (no type checks or filtering necessary)
+        # Scalars are already individual numbers in the lists
         scalars = {
-            col: torch.tensor(row[col], dtype=torch.float)
+            col: torch.tensor(
+                self.processed_scalars[col][idx], dtype=torch.float
+            ).unsqueeze(0)
             for col in self.scalar_cols
-            if col in row.index
+            if col in self.processed_scalars
         }
 
-        # Convert label
-        if self.label_col in row.index:
-            label = torch.tensor(row[self.label_col], dtype=torch.long)
-        else:
-            label = torch.tensor(0, dtype=torch.long)
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
 
         return seq_features, char_features, vector_features, scalars, label
 
@@ -247,47 +214,50 @@ def collate_fn(batch):
     tuple
         Tuple containing batched features
     """
-    # Unzip the batch into separate components
-    seq_features, char_features, vector_features, scalars, labels = zip(*batch)
+    (
+        seq_features_list,
+        char_features_list,
+        vector_features_list,
+        scalars_list,
+        labels_list,
+    ) = zip(*batch)
 
-    # Pad sequences to the same length within the batch
-    padded_seq_features = {}
-    for col in seq_features[0].keys():
-        sequences = [f[col] for f in seq_features if col in f]
-        if sequences:
-            padded_seq_features[col] = torch.nn.utils.rnn.pad_sequence(
-                sequences, batch_first=True
+    batched_seq_features = {}
+    if seq_features_list[0]:
+        for col in seq_features_list[0].keys():
+            batched_seq_features[col] = torch.stack(
+                [f[col] for f in seq_features_list if col in f]
             )
 
-    # Pad character sequences to the same length
-    padded_char_features = {}
-    for col in char_features[0].keys():
-        char_seqs = [f[col] for f in char_features if col in f]
-        if char_seqs:
-            padded_char_features[col] = torch.nn.utils.rnn.pad_sequence(
-                char_seqs, batch_first=True
+    batched_char_features = {}
+    if char_features_list[0]:
+        for col in char_features_list[0].keys():
+            batched_char_features[col] = torch.stack(
+                [f[col] for f in char_features_list if col in f]
             )
 
-    # Stack vector features
-    stacked_vector_features = {}
-    for col in vector_features[0].keys():
-        vectors = [f[col] for f in vector_features if col in f]
-        if vectors:
-            stacked_vector_features[col] = torch.stack(vectors)
+    batched_vector_features = {}
+    if vector_features_list[0]:
+        for col in vector_features_list[0].keys():
+            batched_vector_features[col] = torch.stack(
+                [f[col] for f in vector_features_list if col in f]
+            )
 
-    # Stack scalar features and labels
-    stacked_scalars = {}
-    for col in scalars[0].keys():
-        stacked_scalars[col] = torch.stack([s[col] for s in scalars if col in s])
+    batched_scalars = {}
+    if scalars_list[0]:
+        for col in scalars_list[0].keys():
+            batched_scalars[col] = torch.stack(
+                [s[col] for s in scalars_list if col in s]
+            )
 
-    stacked_labels = torch.stack(labels)
+    batched_labels = torch.stack(labels_list)
 
     return (
-        padded_seq_features,
-        padded_char_features,
-        stacked_vector_features,
-        stacked_scalars,
-        stacked_labels,
+        batched_seq_features,
+        batched_char_features,
+        batched_vector_features,
+        batched_scalars,
+        batched_labels,
     )
 
 
@@ -305,7 +275,7 @@ class DebrimEmbedder(nn.Module):
         vector_dims=None,
     ):
         super().__init__()
-        self.vocab_dict = vocab_dict
+        self.seq_padding_indices = {}
         self.embedding_dim = embedding_dim
         self.seq_pooling = seq_pooling
         self.sequence_cols = sequence_cols or []  # Store sequence column names
@@ -314,55 +284,43 @@ class DebrimEmbedder(nn.Module):
         self.vector_dims = vector_dims or {}
 
         # Create embedding layer for each sequence feature
-        self.seq_embedders = nn.ModuleDict(
-            {
-                col: nn.Embedding(
-                    num_embeddings=len(vocab_dict[col]),
+        self.seq_embedders = nn.ModuleDict()
+        for col in self.sequence_cols:
+            if col in vocab_dict:
+                current_vocab = vocab_dict[col]
+                padding_idx = current_vocab.get_stoi().get("<PAD>", 0)
+                self.seq_embedders[col] = nn.Embedding(
+                    num_embeddings=len(current_vocab),
                     embedding_dim=embedding_dim,
-                    padding_idx=vocab_dict[col]["<PAD>"],
+                    padding_idx=padding_idx,
                 )
-                for col in self.sequence_cols
-                if col in vocab_dict
-            }
-        )
-        # self.seq_embedders = nn.ModuleDict(
-        #     {
-        #         col: nn.EmbeddingBag(
-        #             num_embeddings=len(vocab_dict[col]),
-        #             embedding_dim=embedding_dim,
-        #             mode="mean" if seq_pooling == "mean" else "max",
-        #             padding_idx=vocab_dict[col]["<PAD>"],
-        #         )
-        #         for col in self.sequence_cols
-        #         if col in vocab_dict
-        #     }
-        # )
+                self.seq_padding_indices[col] = padding_idx
 
-        # Character embeddings and GRU
+        self.char_padding_indices = {}  # Also for char features if a similar mask is needed
         if any(col in self.char_cols for col in vocab_dict):
-            self.char_embedders = nn.ModuleDict(
-                {
-                    col: nn.Embedding(
-                        num_embeddings=len(vocab_dict[col]),
-                        embedding_dim=embedding_dim // 2,
-                        padding_idx=vocab_dict[col]["<PAD>"],
-                    )
-                    for col in self.char_cols
-                    if col in vocab_dict
-                }
-            )
+            self.char_embedders = nn.ModuleDict()
+            self.char_gru = nn.ModuleDict()
 
-            self.char_gru = nn.ModuleDict(
-                {
-                    col: nn.GRU(
+            for col in self.char_cols:
+                if col in vocab_dict:
+                    current_vocab = vocab_dict[col]
+                    padding_idx = current_vocab.get_stoi().get("<PAD>", 0)
+                    self.char_embedders[col] = nn.Embedding(
+                        num_embeddings=len(current_vocab),
+                        embedding_dim=embedding_dim // 2,
+                        padding_idx=padding_idx,
+                    )
+                    self.char_padding_indices[col] = padding_idx
+                    # Ensure GRU is created for each char_col that has an embedder
+                    self.char_gru[col] = nn.GRU(
                         input_size=embedding_dim // 2,
                         hidden_size=embedding_dim,
                         batch_first=True,
                         bidirectional=False,
                     )
-                    for col in self.char_cols
-                }
-            )
+        else:  # Ensure these exist even if no char_cols are processed to avoid attribute errors
+            self.char_embedders = nn.ModuleDict()
+            self.char_gru = nn.ModuleDict()
 
         # Vector reducers
         self.vector_reducers = nn.ModuleDict(
@@ -377,12 +335,13 @@ class DebrimEmbedder(nn.Module):
             }
         )
 
-        # Calculate total output dimension - now cleaner with explicit column lists
-        self.output_dim = (
-            len(self.sequence_cols) * embedding_dim
-            + len(self.char_cols) * embedding_dim
-            + len(self.vector_cols) * embedding_dim
-        )
+        self.output_dim = 0
+        if self.seq_embedders:
+            self.output_dim += len(self.sequence_cols) * embedding_dim
+        if self.char_embedders:
+            self.output_dim += len(self.char_cols) * embedding_dim
+        if self.vector_reducers:
+            self.output_dim += len(self.vector_cols) * embedding_dim
 
     def forward(
         self,
@@ -394,82 +353,76 @@ class DebrimEmbedder(nn.Module):
         """Process and embed all feature types."""
         pooled_embeddings = []
 
-        # Process sequence features - simplify by only iterating over known sequence columns
+        # Process sequence features
         for feature_name, sequence in seq_feats.items():
-            if feature_name in self.sequence_cols:
+            if (
+                feature_name in self.seq_embedders
+            ):  # Check if embedder exists for this feature
                 embeddings = self.seq_embedders[feature_name](sequence)
-                padding_mask = (sequence != 0).unsqueeze(-1)
+
+                # Use pre-computed padding index
+                padding_idx_for_mask = self.seq_padding_indices[feature_name]
+
+                padding_mask = (sequence != padding_idx_for_mask).unsqueeze(-1).float()
 
                 if self.seq_pooling == "mean":
                     summed = (embeddings * padding_mask).sum(dim=1)
-                    token_counts = padding_mask.sum(dim=1).clamp(min=1)
+                    token_counts = padding_mask.sum(dim=1).clamp(min=1e-9)
                     pooled = summed / token_counts
-                else:
+                else:  # max pooling
                     masked_embeddings = embeddings.masked_fill(
-                        ~padding_mask.bool(), float("-inf")
+                        padding_mask == 0, float("-inf")
                     )
                     pooled = masked_embeddings.max(dim=1).values
-
                 pooled_embeddings.append(pooled)
 
-        # Process sequence features with EmbeddingBag (modified)
-        # for feature_name, sequence in seq_feats.items():
-        #     if (
-        #         feature_name in self.sequence_cols
-        #         and feature_name in self.seq_embedders
-        #     ):
-        #         # Create offsets tensor for EmbeddingBag
-        #         # Each sequence gets processed as a whole unit
-        #         batch_size = sequence.size(0)
-
-        #         # Filter out padding tokens (0) for more efficient processing
-        #         mask = sequence != 0
-        #         indices = torch.masked_select(sequence, mask)
-
-        #         # Create offsets tensor - marks the start of each sequence
-        #         # Each sequence will be processed together by EmbeddingBag
-        #         offsets = torch.zeros(
-        #             batch_size, dtype=torch.long, device=sequence.device
-        #         )
-
-        #         # Calculate offsets based on cumulative sum of valid tokens per sequence
-        #         if batch_size > 1:
-        #             seq_lengths = mask.sum(dim=1)
-        #             offsets[1:] = torch.cumsum(seq_lengths[:-1], dim=0)
-
-        #         # Use EmbeddingBag to get pooled embeddings directly
-        #         pooled = self.seq_embedders[feature_name](indices, offsets)
-        #         pooled_embeddings.append(pooled)
-
-        # Process character features - simplify by only iterating over known char columns
+        # Process character features
         for feature_name, char_sequence in char_feats.items():
-            if feature_name in self.char_cols:
-                # Use batch_first=True (already in your code)
+            if (
+                feature_name in self.char_embedders and feature_name in self.char_gru
+            ):  # Check both exist
                 char_embeddings = self.char_embedders[feature_name](char_sequence)
-
-                # Pack padded sequence for more efficient GRU processing
-                lengths = lengths = char_sequence.ne(0).sum(1).to("cpu")
-                packed = torch.nn.utils.rnn.pack_padded_sequence(
-                    char_embeddings, lengths, batch_first=True, enforce_sorted=False
-                )
-
-                # Process through GRU
-                _, hidden = self.char_gru[feature_name](packed)
+                gru_output, hidden = self.char_gru[feature_name](char_embeddings)
                 pooled_embeddings.append(hidden.squeeze(0))
 
-        # Process vector features - simplify by only iterating over known vector columns
+        # Process vector features
         for feature_name, vector in vector_feats.items():
-            if feature_name in self.vector_cols:
+            if feature_name in self.vector_reducers:  # Check if reducer exists
                 reduced = self.vector_reducers[feature_name](vector)
                 pooled_embeddings.append(reduced)
 
-        # Rest of the method remains the same
-        if pooled_embeddings:
-            concatenated_embeddings = torch.cat(pooled_embeddings, dim=1)
-        else:
-            concatenated_embeddings = torch.zeros(
-                (1, self.output_dim), device=next(self.parameters()).device
+        if not pooled_embeddings:
+            batch_size = 1
+            # Try to determine batch_size from any of the input tensors
+            if seq_feats:
+                batch_size = next(iter(seq_feats.values())).size(0)
+            elif char_feats:
+                batch_size = next(iter(char_feats.values())).size(0)
+            elif vector_feats:
+                batch_size = next(iter(vector_feats.values())).size(0)
+            elif scalars:
+                batch_size = next(iter(scalars.values())).size(0)
+
+            device = (
+                next(self.parameters()).device
+                if list(self.parameters())
+                else torch.device("cpu")
             )
+
+            # Ensure output_dim is sensible if no embeddings were generated
+            effective_output_dim = self.output_dim if self.output_dim > 0 else 1
+            # If output_dim is 0 because no embedders were configured, this will be 1.
+            # The classifier's input_dim should align with this.
+
+            concatenated_embeddings = torch.zeros(
+                (batch_size, effective_output_dim), device=device
+            )
+            if self.output_dim == 0:
+                print(
+                    "Warning: DebrimEmbedder output_dim is 0. No embeddings generated, returning zeros."
+                )
+        else:
+            concatenated_embeddings = torch.cat(pooled_embeddings, dim=1)
 
         return concatenated_embeddings, scalars
 
@@ -583,11 +536,11 @@ class DebrimModel(nn.Module):
     def from_config(
         cls,
         vocab_dict: dict[str, Vocab],
-        sequence_cols: list[str] = None,
-        scalar_cols: list[str] = None,
-        char_cols: list[str] = None,
-        vector_cols: list[str] = None,
-        vector_dims: dict[str, int] = None,
+        sequence_cols: list[str],
+        scalar_cols: list[str],
+        char_cols: list[str],
+        vector_cols: list[str],
+        vector_dims: dict[str, int],
         embedding_dim: int = 128,
         seq_pooling: Literal["mean", "max"] = "mean",
         hidden_dim: list[int] = [128, 64],
@@ -650,18 +603,10 @@ class DebrimModel(nn.Module):
 
         # Process scalar features if present
         if self.scalar_dim > 0 and scalars:
-            # Convert scalar features dictionary to a list of tensors
-            scalar_tensors = [scalars[col] for col in scalars]
+            scalar_tensors = [scalars[col] for col in scalars if col in scalars]
 
             if scalar_tensors:
-                # Concatenate scalar features into a single tensor
-                scalar_tensor = (
-                    torch.cat(scalar_tensors, dim=1)
-                    if len(scalar_tensors) > 1
-                    else scalar_tensors[0].unsqueeze(1)
-                )
-
-                # Concatenate with embeddings
+                scalar_tensor = torch.cat(scalar_tensors, dim=1)
                 combined_features = torch.cat([embeddings, scalar_tensor], dim=1)
             else:
                 combined_features = embeddings
@@ -686,8 +631,6 @@ def get_best_available_device() -> torch.device:
     torch.device
         The best available computation device for PyTorch
     """
-    import torch
-    import platform
 
     # Check for NVIDIA GPU with CUDA support
     if torch.cuda.is_available():
@@ -710,61 +653,187 @@ def get_best_available_device() -> torch.device:
     return device
 
 
-# Training function for neural network models
 def train_nn_model(
     df: pd.DataFrame,
     vocab_dict: dict[str, Vocab],
+    sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
     vector_cols: list[str],
     vector_dims: dict[str, int],
     hyperparams: NNHyperparams = NNHyperparams(),
     device: torch.device | None = None,
-) -> tuple[DebrimModel, list[float]]:
+    train_split_ratio: float = 0.8,
+    val_df_explicit: pd.DataFrame | None = None,
+    scoring_metric: Literal[
+        "accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"
+    ] = "f1",
+    random_seed: int = 42,
+) -> tuple[DebrimModel, dict[str, Any], dict[str, StandardScaler]]:
     """
     Train a neural network model on the given dataset.
+    Can perform a single train/validation split or use explicitly provided validation data.
 
     Parameters
     ----------
     df : pandas.DataFrame
-        The dataset containing features and labels
+        The dataset containing features and labels.
     vocab_dict : dict
-        Dictionary mapping feature names to vocabulary objects
+        Dictionary mapping feature names to vocabulary objects.
+    sequence_cols : list
+        List of sequence columns.
     scalar_cols : list
-        List of scalar columns to include as numerical features
+        List of scalar columns to include as numerical features.
     char_cols : list
-        List of columns to be processed character by character
+        List of columns to be processed character by character.
     vector_cols : list
-        List of columns containing fixed-length vectors
+        List of columns containing fixed-length vectors.
     vector_dims : dict
-        Dictionary specifying the dimension of each vector feature
+        Dictionary specifying the dimension of each vector feature.
     hyperparams : NNHyperparams
-        Dataclass containing all hyperparameters for model training
+        Dataclass containing all hyperparameters for model training.
     device : torch.device or None
-        Device to run the training on (defaults to best available device)
+        Device to run the training on (defaults to best available device).
+    train_split_ratio : float
+        Proportion of the dataset to use for training (0.0 to 1.0).
+    val_df_explicit : pandas.DataFrame or None
+        Explicit validation DataFrame to use instead of splitting from training data.
+        If provided, `train_split_ratio` is ignored.
+    scoring_metric : str
+        Primary metric to use for model evaluation.
+    random_seed : int
+        Random seed for reproducibility.
 
     Returns
     -------
     tuple
-        (trained_model, training_losses)
+        (trained_model, results_dict, scalers_used)
     """
-    # Create dataset and data loader for training
-    dataset = DebrimDataset(
-        df,
-        vocab_dict,
+    if device is None:
+        device = get_best_available_device()
+
+    torch.manual_seed(random_seed)
+    np.random.seed(random_seed)
+    if device.type == "cuda":
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    print(f"Using device: {device}")
+    print(f"Using {scoring_metric} as the primary scoring metric for validation.")
+
+    train_df = df
+    val_df = val_df_explicit
+
+    if val_df is None:
+        print(
+            f"Performing internal train/validation split with ratio: {train_split_ratio}"
+        )
+        train_df, val_df = train_test_split(
+            df,
+            train_size=train_split_ratio,
+            random_state=random_seed,
+            stratify=df[hyperparams.label_col]
+            if hyperparams.label_col in df.columns
+            else None,
+        )
+        train_df = train_df.reset_index(drop=True)
+        val_df = val_df.reset_index(drop=True)
+    else:
+        print("Using explicitly provided training and validation DataFrames.")
+        train_df = train_df.copy().reset_index(drop=True)
+        val_df = val_df.copy().reset_index(drop=True)
+
+    print(f"Training set size: {len(train_df)}, Validation set size: {len(val_df)}")
+    if hyperparams.label_col in train_df.columns:  # Check train_df for label_col
+        print(
+            f"Training set class distribution: {train_df[hyperparams.label_col].value_counts().to_dict()}"
+        )
+    if hyperparams.label_col in val_df.columns:  # Check val_df for label_col
+        print(
+            f"Validation set class distribution: {val_df[hyperparams.label_col].value_counts().to_dict()}"
+        )
+
+    # Normalize scalar and vector features
+    scalers_used = {}
+    train_df, scalers_used = apply_scalers_to_dataframe(
+        train_df, scalar_cols, vector_cols, fit_scalers=True
+    )
+    val_df, _ = apply_scalers_to_dataframe(
+        val_df, scalar_cols, vector_cols, scalers=scalers_used, fit_scalers=False
+    )
+
+    # Compute class weights for imbalanced data based on the training set
+    y_train = train_df[hyperparams.label_col].values
+    expected_classes = np.array([0, 1])
+    if len(np.unique(y_train)) < len(expected_classes) and hyperparams.n_classes == 2:
+        print(
+            "Warning: Not all classes present in training data. Using uniform class weights."
+        )
+        class_weights_arr = np.ones(hyperparams.n_classes)
+    else:
+        class_weights_arr = compute_class_weight(
+            class_weight="balanced", classes=np.unique(y_train), y=y_train
+        )
+        # Ensure weights array matches n_classes if some classes are missing
+        if len(class_weights_arr) < hyperparams.n_classes:
+            temp_weights = np.ones(hyperparams.n_classes)
+            present_classes = np.unique(y_train)
+            for i, cls_val in enumerate(present_classes):
+                if cls_val < hyperparams.n_classes:  # Ensure class index is valid
+                    temp_weights[cls_val] = class_weights_arr[i]
+            class_weights_arr = temp_weights
+
+    weights_tensor = torch.tensor(class_weights_arr, dtype=torch.float).to(device)
+    print(f"Using class weights: {class_weights_arr}")
+
+    # Create datasets and data loaders
+    train_dataset = DebrimDataset(
+        train_df,
+        sequence_cols=sequence_cols,
+        scalar_cols=scalar_cols,
+        char_cols=char_cols,
+        vector_cols=vector_cols,
+        label_col=hyperparams.label_col,
+    )
+    val_dataset = DebrimDataset(
+        val_df,
+        sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
         char_cols=char_cols,
         vector_cols=vector_cols,
         label_col=hyperparams.label_col,
     )
 
-    data_loader = DataLoader(
-        dataset, batch_size=hyperparams.batch_size, shuffle=True, collate_fn=collate_fn
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=hyperparams.batch_size,
+        shuffle=True,
+        collate_fn=collate_fn,
+        num_workers=hyperparams.dataloader_num_workers,
+        pin_memory=hyperparams.dataloader_pin_memory
+        if device.type == "cuda"
+        else False,
+        persistent_workers=hyperparams.dataloader_persistent_workers
+        and hyperparams.dataloader_num_workers > 0,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=hyperparams.batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        num_workers=hyperparams.dataloader_num_workers,
+        pin_memory=hyperparams.dataloader_pin_memory
+        if device.type == "cuda"
+        else False,
+        persistent_workers=hyperparams.dataloader_persistent_workers
+        and hyperparams.dataloader_num_workers > 0,
     )
 
-    # Initialize model with configuration from hyperparameters
+    # Initialize model
     model = DebrimModel.from_config(
         vocab_dict,
+        sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
         char_cols=char_cols,
         vector_cols=vector_cols,
@@ -774,114 +843,328 @@ def train_nn_model(
         seq_pooling=hyperparams.seq_pooling,
         n_classes=hyperparams.n_classes,
         dropout=hyperparams.dropout,
+    ).to(device)
+
+    # Optimizer
+    if hyperparams.optimizer == "adam":
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=hyperparams.max_learning_rate,
+            weight_decay=hyperparams.weight_decay,
+        )
+    elif hyperparams.optimizer == "adamw":
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=hyperparams.max_learning_rate,
+            weight_decay=hyperparams.weight_decay,
+        )
+    elif hyperparams.optimizer == "sgd":
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=hyperparams.max_learning_rate,
+            weight_decay=hyperparams.weight_decay,
+            momentum=0.9,
+        )  # Added momentum for SGD
+    else:
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=hyperparams.max_learning_rate,
+            weight_decay=hyperparams.weight_decay,
+        )
+
+    # Scheduler
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=hyperparams.max_learning_rate,  # Use max_learning_rate from hyperparams
+        steps_per_epoch=len(train_loader),
+        epochs=hyperparams.epochs,
     )
 
-    # Configure optimizer based on hyperparameters
-    match hyperparams.optimizer:
-        case "adam":
-            optimizer = optim.Adam(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        case "adamw":
-            optimizer = optim.AdamW(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        case "sgd":
-            optimizer = optim.SGD(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        case _:
-            # Default to Adam if invalid optimizer specified
-            optimizer = torch.optim.Adam(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-
-    # Loss function for training
-    criterion = nn.CrossEntropyLoss()
-
-    # Select computation device
-    if device is None:
-        device = get_best_available_device()
-
-    print(f"Using device: {device}")
-    model = model.to(device)
+    criterion = nn.CrossEntropyLoss(weight=weights_tensor)
+    scaler = GradScaler(enabled=(device.type == "cuda"))  # Enable only for CUDA
 
     # Training loop
-    model.train()
-    training_losses = []
-    best_loss = float("inf")
+    train_losses_epoch, val_losses_epoch = [], []
+    best_val_metric_score = (
+        -float("inf")
+        if scoring_metric
+        in ["roc_auc", "pr_auc", "f1", "recall", "precision", "accuracy"]
+        else float("inf")
+    )
+    best_val_loss = float("inf")  # For saving model based on val loss
+
     patience_counter = 0
+    best_model_state = None
+
+    hyperparams_dict_log = {k: v for k, v in hyperparams.__dict__.items()}
+    results = {
+        "hyperparams": hyperparams_dict_log,
+        "train_losses": [],
+        "val_losses": [],
+        "accuracy": [],
+        "precision": [],
+        "recall": [],
+        "f1": [],
+        "roc_auc": [],
+        "pr_auc": [],
+        "pr_curve_data": [],
+        "roc_curve_data": [],
+        "conf_matrix": None,
+        "model_size": None,
+        "training_time": None,
+        "best_epoch": -1,
+        "final_metrics_best_model": {},
+    }
+
+    print("Starting training...")
+    training_start_time = time.time()
 
     for epoch in range(hyperparams.epochs):
-        epoch_loss = 0.0
+        model.train()
+        epoch_train_loss = 0.0
 
-        # Process batches
-        for seq_feats, char_feats, vector_feats, scalars, labels in data_loader:
-            # Move batch data to the selected device
+        for batch_idx, (
+            seq_feats,
+            char_feats,
+            vector_feats,
+            scalars,
+            labels,
+        ) in enumerate(train_loader):
             seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
             char_feats = {k: v.to(device) for k, v in char_feats.items()}
             vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
             scalars = {k: v.to(device) for k, v in scalars.items()}
             labels = labels.to(device)
 
-            # Forward pass
-            optimizer.zero_grad()
-            logits = model(seq_feats, char_feats, vector_feats, scalars)
-            loss = criterion(logits, labels)
+            optimizer.zero_grad(set_to_none=True)
 
-            # Backward pass and optimization
-            loss.backward()
-            optimizer.step()
+            with autocast(enabled=(device.type == "cuda")):
+                logits = model(seq_feats, char_feats, vector_feats, scalars)
+                loss = criterion(logits, labels)
 
-            epoch_loss += loss.item()
+            if not torch.isfinite(loss):
+                print(
+                    f"NaN loss detected at Epoch {epoch + 1}, Batch {batch_idx}! Stopping."
+                )
+                results["training_time"] = time.time() - training_start_time
 
-        # Calculate average loss for the epoch
-        avg_loss = epoch_loss / len(data_loader)
-        training_losses.append(avg_loss)
-        print(f"Epoch {epoch + 1}/{hyperparams.epochs} — Loss: {avg_loss:.4f}")
+                print("Warning: Training stopped due to NaN loss.")
+                return model, results, scalers_used
 
-        # Early stopping logic
-        if hyperparams.early_stopping:
-            if avg_loss < best_loss:
-                best_loss = avg_loss
-                patience_counter = 0
-            else:
-                patience_counter += 1
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)  # Unscale before clipping
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=hyperparams.grad_scaler_max_norm
+            )
+            scaler.step(optimizer)
+            scaler.update()
+            scheduler.step()  # Scheduler step per batch for OneCycleLR
 
-            if patience_counter >= hyperparams.patience:
-                print(f"Early stopping triggered after {epoch + 1} epochs")
-                break
+            epoch_train_loss += loss.item()
+            if batch_idx % (len(train_loader) // 5 + 1) == 0:  # Log ~5 times per epoch
+                print(
+                    f"Epoch {epoch + 1}, Batch {batch_idx}/{len(train_loader)}, Train Loss: {loss.item():.4f}, LR: {optimizer.param_groups[0]['lr']:.2e}"
+                )
 
-    return model, training_losses
+        avg_epoch_train_loss = epoch_train_loss / len(train_loader)
+        results["train_losses"].append(avg_epoch_train_loss)
+        print(
+            f"Epoch {epoch + 1}/{hyperparams.epochs} — Train Loss: {avg_epoch_train_loss:.4f}"
+        )
+
+        # Validation phase
+        model.eval()
+        epoch_val_loss = 0.0
+        y_true_val, y_pred_val, y_prob_val = [], [], []
+        with torch.no_grad():
+            for seq_feats, char_feats, vector_feats, scalars, labels in val_loader:
+                seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
+                char_feats = {k: v.to(device) for k, v in char_feats.items()}
+                vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
+                scalars = {k: v.to(device) for k, v in scalars.items()}
+                labels = labels.to(device)
+
+                with autocast(enabled=(device.type == "cuda")):
+                    logits = model(seq_feats, char_feats, vector_feats, scalars)
+                    loss = criterion(logits, labels)
+
+                epoch_val_loss += loss.item()
+                preds = torch.argmax(logits, dim=1)
+                probs = F.softmax(logits, dim=1)[:, 1]  # Prob of positive class
+
+                y_true_val.extend(labels.cpu().tolist())
+                y_pred_val.extend(preds.cpu().tolist())
+                y_prob_val.extend(probs.cpu().tolist())
+
+        avg_epoch_val_loss = epoch_val_loss / len(val_loader)
+        results["val_losses"].append(avg_epoch_val_loss)
+
+        if not np.all(np.isfinite(y_prob_val)):
+            print(
+                f"  Warning: NaN detected in validation probabilities at epoch {epoch + 1}. Assigning worst possible score for this epoch."
+            )
+            # Assign worst scores and skip metric calculation to avoid crashing
+            acc_val, prec_val, rec_val, f1_val, roc_auc_val, pr_auc_val = (
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )
+            current_pr_curve_data, current_roc_curve_data = None, None
+        else:
+            # Calculate validation metrics
+            acc_val = accuracy_score(y_true_val, y_pred_val)
+            prec_val = precision_score(
+                y_true_val, y_pred_val, average="binary", zero_division=0
+            )
+            rec_val = recall_score(
+                y_true_val, y_pred_val, average="binary", zero_division=0
+            )
+            f1_val = f1_score(y_true_val, y_pred_val, average="binary", zero_division=0)
+
+            roc_auc_val, pr_auc_val = 0.0, 0.0
+            current_pr_curve_data, current_roc_curve_data = None, None
+            if (
+                len(np.unique(y_true_val)) > 1
+            ):  # AUC scores require at least two classes
+                fpr, tpr, _ = roc_curve(y_true_val, y_prob_val)
+                roc_auc_val = auc(fpr, tpr)
+                current_roc_curve_data = (fpr.tolist(), tpr.tolist())
+
+                precision_vals, recall_vals, _ = precision_recall_curve(
+                    y_true_val, y_prob_val
+                )
+                pr_auc_val = auc(
+                    recall_vals, precision_vals
+                )  # Recall is x-axis for PR-AUC
+                current_pr_curve_data = (precision_vals.tolist(), recall_vals.tolist())
+
+        results["accuracy"].append(acc_val)
+        results["precision"].append(prec_val)
+        results["recall"].append(rec_val)
+        results["f1"].append(f1_val)
+        results["roc_auc"].append(roc_auc_val)
+        results["pr_auc"].append(pr_auc_val)
+
+        current_metric_score = 0
+        if scoring_metric == "f1":
+            current_metric_score = f1_val
+        elif scoring_metric == "recall":
+            current_metric_score = rec_val
+        elif scoring_metric == "precision":
+            current_metric_score = prec_val
+        elif scoring_metric == "accuracy":
+            current_metric_score = acc_val
+        elif scoring_metric == "roc_auc":
+            current_metric_score = roc_auc_val
+        elif scoring_metric == "pr_auc":
+            current_metric_score = pr_auc_val
+        else:
+            current_metric_score = f1_val  # Default
+
+        print(
+            f"Epoch {epoch + 1} — Val Loss: {avg_epoch_val_loss:.4f}, Val {scoring_metric.capitalize()}: {current_metric_score:.4f} "
+            f"(Acc: {acc_val:.4f}, P: {prec_val:.4f}, R: {rec_val:.4f}, F1: {f1_val:.4f}, ROC: {roc_auc_val:.4f}, PR: {pr_auc_val:.4f})"
+        )
+
+        # Early stopping logic based on validation loss
+        # Save model if current val_loss is better
+        if avg_epoch_val_loss < best_val_loss:
+            best_val_loss = avg_epoch_val_loss
+            best_model_state = (
+                model.state_dict().copy()
+            )  # Save state of the best model based on val_loss
+            results["best_epoch"] = epoch + 1
+            # Store metrics for this best model
+            results["final_metrics_best_model"] = {
+                "accuracy": acc_val,
+                "precision": prec_val,
+                "recall": rec_val,
+                "f1": f1_val,
+                "roc_auc": roc_auc_val,
+                "pr_auc": pr_auc_val,
+                "val_loss": avg_epoch_val_loss,
+            }
+            results["pr_curve_data"] = current_pr_curve_data
+            results["roc_curve_data"] = current_roc_curve_data
+            results["conf_matrix"] = confusion_matrix(y_true_val, y_pred_val).tolist()
+            patience_counter = 0
+            print(f"  New best model (by val_loss) saved at epoch {epoch + 1}.")
+        else:
+            patience_counter += 1
+
+        if hyperparams.early_stopping and patience_counter >= hyperparams.patience:
+            print(
+                f"Early stopping triggered after {epoch + 1} epochs due to no improvement in validation loss."
+            )
+            break
+
+    results["training_time"] = time.time() - training_start_time
+
+    # Load the best model state
+    if best_model_state:
+        model.load_state_dict(best_model_state)
+        print(
+            f"Loaded best model from epoch {results['best_epoch']} with Val Loss: {results['final_metrics_best_model'].get('val_loss', 'N/A'):.4f}"
+        )
+    else:  # Should not happen if training ran for at least one epoch
+        print("Warning: No best model state was saved. Returning the last state.")
+
+    # Get model size
+    try:
+        fd, path = tempfile.mkstemp(suffix=".pth")
+        os.close(fd)
+        torch.save(model.state_dict(), path)
+        results["model_size"] = os.path.getsize(path) / 1024
+        os.remove(path)
+    except Exception as e:
+        print(f"Could not get model size: {e}")
+        results["model_size"] = -1.0
+
+    print(
+        f"\nTraining finished. Total time: {results['training_time']:.2f}s. Model size: {results['model_size']:.2f} KB"
+    )
+    if results["best_epoch"] != -1:
+        print(f"Best model (by val_loss) obtained at epoch {results['best_epoch']}:")
+        for metric_name, metric_val in results["final_metrics_best_model"].items():
+            print(f"  - {metric_name.capitalize()}: {metric_val:.4f}")
+
+    # Explicit cleanup before returning
+    del train_df, val_df, train_dataset, val_dataset, train_loader, val_loader
+    del optimizer, scheduler, criterion, scaler
+    if best_model_state:
+        del best_model_state
+
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
+    gc.collect()
+
+    return model, results, scalers_used
 
 
 def cross_val_train_nn_model(
     df: pd.DataFrame,
     vocab_dict: dict[str, Vocab],
-    sequence_cols: list[str],  # Added this parameter
+    sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
     vector_cols: list[str],
     vector_dims: dict[str, int],
     hyperparams: NNHyperparams = NNHyperparams(),
     n_folds: int = 2,
-    n_repetitions: int = 5,
+    n_repetitions: int = 1,
     scoring_metric: Literal[
         "accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"
     ] = "f1",
     device: torch.device | None = None,
     random_seed: int = 42,
-) -> tuple[dict[str, Any], DebrimModel]:
+) -> tuple[DebrimModel | None, dict[str, Any], dict[str, StandardScaler] | None]:
     """
-    Train a neural network model with cross-validation using the provided hyperparameters
+    Train a neural network model with cross-validation using the provided hyperparameters.
+    This function now calls train_nn_model for each fold.
 
     Parameters:
     -----------
@@ -908,992 +1191,214 @@ def cross_val_train_nn_model(
     Returns:
     --------
     tuple
-        (results_dict, best_model)
+        (best_model, results_dict, best_model_scalers)
     """
-    import numpy as np
-    import torch
-    import torch.nn.functional as F
-    from sklearn.model_selection import RepeatedStratifiedKFold
-    from sklearn.utils.class_weight import compute_class_weight
-    from sklearn.metrics import (
-        accuracy_score,
-        f1_score,
-        precision_score,
-        recall_score,
-        auc,
-        confusion_matrix,
-        precision_recall_curve,
-        roc_curve,
-    )
-    from torch.utils.data import DataLoader
-    import tempfile
-    import os
-    import time
 
-    # Check if GPU acceleration is available
     if device is None:
         device = get_best_available_device()
 
+    print(f"--- Cross-Validation Training ---")
     print(f"Using device: {device}")
-    print(f"Using {scoring_metric} as the primary scoring metric")
+    print(f"Primary scoring metric for best model selection: {scoring_metric.upper()}")
+    print(f"Number of folds: {n_folds}, Number of repetitions: {n_repetitions}")
 
-    # Prepare for repeated stratified k-fold
-    X = np.arange(len(df))  # Just indices, actual features handled by Dataset
+    X = np.arange(len(df))
     y = df[hyperparams.label_col].values
 
-    # Compute class weights for imbalanced data
-    expected_classes = np.array([0, 1])  # For binary classification
-    if len(np.unique(y)) < len(expected_classes):
-        print(
-            "Warning: Not all classes present in dataset. Using uniform class weights."
-        )
-        class_weights = np.ones(len(expected_classes))
-    else:
-        class_weights = compute_class_weight(
-            class_weight="balanced", classes=expected_classes, y=y
-        )
-
-    weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
-    print(f"Using class weights: {class_weights}")
-
-    # Setup cross-validation
     rskf = RepeatedStratifiedKFold(
         n_splits=n_folds, n_repeats=n_repetitions, random_state=random_seed
     )
 
-    # Convert hyperparams to dict for storing in results
-    hyperparams_dict = {
-        "batch_size": hyperparams.batch_size,
-        "learning_rate": hyperparams.learning_rate,
-        "epochs": hyperparams.epochs,
-        "early_stopping": hyperparams.early_stopping,
-        "patience": hyperparams.patience,
-        "optimizer": hyperparams.optimizer,
-        "weight_decay": hyperparams.weight_decay,
-        "embedding_dim": hyperparams.embedding_dim,
-        "hidden_dim": hyperparams.hidden_dims,
-        "dropout": hyperparams.dropout,
-        "seq_pooling": hyperparams.seq_pooling,
-        "n_classes": hyperparams.n_classes,
-        "label_col": hyperparams.label_col,
-    }
-
-    # Initialize results storage
-    results = {
+    # Initialize results storage for aggregated metrics
+    # We will store the 'final_metrics_best_model' from each fold's train_nn_model run
+    aggregated_results = {
         "accuracy": [],
         "precision": [],
         "recall": [],
         "f1": [],
-        "pr_auc": [],
         "roc_auc": [],
-        "pr_curve_data": [],
-        "roc_curve_data": [],
-        "conf_matrices": [],
+        "pr_auc": [],
+        "val_loss": [],
+        # Per-fold details
         "model_size": [],
+        "training_time": [],
+        "roc_curve_data": [],
+        "pr_curve_data": [],
+        "conf_matrices": [],
         "train_losses": [],
         "val_losses": [],
-        "training_time": [],
+        # Metadata
         "fold_info": [],
-        "hyperparams": hyperparams_dict,
+        "hyperparams": {k: v for k, v in hyperparams.__dict__.items()},
     }
 
-    # Track the best model across all folds
-    best_model = None
-    best_score = -1  # Track best score for the selected metric
-    best_model_state = None
-    best_fold_idx = -1
+    overall_best_model_state = None
+    overall_best_scalers = None
+    overall_best_score = -float("inf")
+    best_fold_info_str = "N/A"
 
-    fold_count = 1
-    # Iterate through repetitions and folds
+    fold_counter = 0
     for rep_idx, (train_idx, val_idx) in enumerate(rskf.split(X, y)):
-        # Calculate current repetition and fold
+        fold_counter += 1
         current_rep = (rep_idx // n_folds) + 1
-        current_fold = (rep_idx % n_folds) + 1
+        current_fold_in_rep = (rep_idx % n_folds) + 1
 
         print(
-            f"\n=== Repetition {current_rep}/{n_repetitions}, Fold {current_fold}/{n_folds} ==="
+            f"\n--- Repetition {current_rep}/{n_repetitions}, Fold {current_fold_in_rep}/{n_folds} (Overall Fold {fold_counter}) ---"
         )
 
-        # Split data
-        train_df = df.iloc[train_idx].reset_index(drop=True)
-        val_df = df.iloc[val_idx].reset_index(drop=True)
+        train_df_fold = df.iloc[
+            train_idx
+        ]  # No reset_index here, train_nn_model will handle it
+        val_df_fold = df.iloc[val_idx]  # No reset_index here
 
-        # Check class distribution in splits
-        print(
-            f"Training set class distribution: {train_df[hyperparams.label_col].value_counts().to_dict()}"
-        )
-        print(
-            f"Validation set class distribution: {val_df[hyperparams.label_col].value_counts().to_dict()}"
-        )
-
-        # Create datasets and loaders
-        train_dataset = DebrimDataset(
-            train_df,
+        # Call the main training function for this fold
+        # Note: train_nn_model will handle its own normalization based on train_df_fold
+        model_fold, results_fold, scalers_fold = train_nn_model(
+            df=train_df_fold,  # This is the training data for this fold
+            val_df_explicit=val_df_fold,  # This is the validation data for this fold
             vocab_dict=vocab_dict,
             sequence_cols=sequence_cols,
-            char_cols=char_cols,
-            vector_cols=vector_cols,
             scalar_cols=scalar_cols,
-            label_col=hyperparams.label_col,
-        )
-        val_dataset = DebrimDataset(
-            val_df,
-            vocab_dict=vocab_dict,
-            sequence_cols=sequence_cols,
-            char_cols=char_cols,
-            vector_cols=vector_cols,
-            scalar_cols=scalar_cols,
-            label_col=hyperparams.label_col,
-        )
-
-        print("Created datasets for training and validation")
-
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=hyperparams.batch_size,
-            shuffle=True,
-            collate_fn=collate_fn,
-            num_workers=16,
-            pin_memory=True,
-            persistent_workers=True,
-        )
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=hyperparams.batch_size,
-            shuffle=False,
-            collate_fn=collate_fn,
-            num_workers=16,
-            pin_memory=True,
-            persistent_workers=True,
-        )
-
-        print("Created loaders for training and validation")
-
-        # Instantiate model with hyperparameters
-        model = DebrimModel.from_config(
-            vocab_dict,
-            scalar_cols=scalar_cols,
-            sequence_cols=sequence_cols,
             char_cols=char_cols,
             vector_cols=vector_cols,
             vector_dims=vector_dims,
-            embedding_dim=hyperparams.embedding_dim,
-            seq_pooling=hyperparams.seq_pooling,
-            hidden_dim=hyperparams.hidden_dims,
-            n_classes=hyperparams.n_classes,
-            dropout=hyperparams.dropout,
-        ).to(device)
+            hyperparams=hyperparams,  # Pass the same hyperparams for each fold
+            device=device,
+            # train_split_ratio is ignored because val_df_explicit is provided
+            scoring_metric=scoring_metric,  # train_nn_model uses this for its internal best model (by val_loss)
+            random_seed=random_seed
+            + fold_counter,  # Vary seed slightly per fold for optimizer init if desired
+        )
 
-        print("Initialized model with specified configuration")
+        # Extract metrics from the 'final_metrics_best_model' dict returned by train_nn_model
+        # This dict contains metrics of the model that had the best *validation loss* within that fold's training
+        fold_final_metrics = results_fold.get("final_metrics_best_model", {})
 
-        # Optimizer based on hyperparameters
-        if hyperparams.optimizer == "adam":
-            optimizer = torch.optim.Adam(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        elif hyperparams.optimizer == "adamw":
-            optimizer = torch.optim.AdamW(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        elif hyperparams.optimizer == "sgd":
-            optimizer = torch.optim.SGD(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
-        else:
-            # Default to Adam if invalid optimizer specified
-            optimizer = torch.optim.Adam(
-                model.parameters(),
-                lr=hyperparams.learning_rate,
-                weight_decay=hyperparams.weight_decay,
-            )
+        for metric_key in aggregated_results.keys():
+            if metric_key in fold_final_metrics:
+                aggregated_results[metric_key].append(fold_final_metrics[metric_key])
 
-        criterion = torch.nn.CrossEntropyLoss(weight=weights_tensor)
+        aggregated_results["model_size"].append(results_fold.get("model_size"))
+        aggregated_results["training_time"].append(results_fold.get("training_time"))
+        aggregated_results["roc_curve_data"].append(results_fold.get("roc_curve_data"))
+        aggregated_results["pr_curve_data"].append(results_fold.get("pr_curve_data"))
+        aggregated_results["conf_matrices"].append(results_fold.get("conf_matrix"))
+        aggregated_results["train_losses"].append(results_fold.get("train_losses"))
+        aggregated_results["val_losses"].append(results_fold.get("val_losses"))
 
-        # Training trackers
-        best_val_loss = float("inf")
-        current_best_model_state = None
-        epochs_no_improve = 0
-        train_losses, val_losses = [], []
-
-        for param in model.parameters():
-            if param.device != device:
-                param.data = param.data.to(device)
-
-        print("Starting training...")
-
-        # Measure training time
-        start_time = time.time()
-
-        # Training loop
-        for epoch in range(hyperparams.epochs):
-            # Training phase
-            model.train()
-            epoch_train_loss = 0
-            batch_idx = 0
-
-            for seq_feats, char_feats, vector_feats, scalars, label in train_loader:
-                seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-                char_feats = {k: v.to(device) for k, v in char_feats.items()}
-                vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-                scalars = {k: v.to(device) for k, v in scalars.items()}
-                label = label.to(device)
-
-                # with profile(
-                #     activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                #     profile_memory=True,
-                #     record_shapes=True,
-                # ) as prof:
-                #     with record_function("model_training"):
-                #         # Forward pass
-                #         optimizer.zero_grad()
-                #         logits = model(seq_feats, char_feats, vector_feats, scalars)
-                #         loss = criterion(logits, label)
-                #         # Backward
-                #         loss.backward()
-                #         optimizer.step()
-
-                # print(
-                #     prof.key_averages().table(sort_by="cuda_time_total", row_limit=10)
-                # )
-
-                optimizer.zero_grad()
-                logits = model(seq_feats, char_feats, vector_feats, scalars)
-                loss = criterion(logits, label)
-                loss.backward()
-                optimizer.step()
-
-                if batch_idx % 2 == 0:
-                    print(
-                        f"Epoch {epoch + 1}, Batch {batch_idx}/{len(train_loader)}, Loss: {loss.item():.4f}"
-                    )
-
-                epoch_train_loss += loss.item()
-                batch_idx += 1
-
-            avg_train_loss = epoch_train_loss / len(train_loader)
-            train_losses.append(avg_train_loss)
-
-            print(
-                f"Epoch {epoch + 1}/{hyperparams.epochs} — Train Loss: {avg_train_loss:.4f}"
-            )
-
-            # Validation phase
-            model.eval()
-            epoch_val_loss = 0
-            y_true, y_pred, y_prob = [], [], []
-
-            with torch.no_grad():
-                for seq_feats, char_feats, vector_feats, scalars, label in val_loader:
-                    seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-                    char_feats = {k: v.to(device) for k, v in char_feats.items()}
-                    vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-                    scalars = {k: v.to(device) for k, v in scalars.items()}
-                    label = label.to(device)
-
-                    logits = model(seq_feats, char_feats, vector_feats, scalars)
-                    loss = criterion(logits, label)
-                    epoch_val_loss += loss.item()
-
-                    preds = torch.argmax(logits, dim=1)
-                    probs = F.softmax(logits, dim=1)[
-                        :, 1
-                    ]  # Probability of positive class
-
-                    y_true.extend(label.cpu().tolist())
-                    y_pred.extend(preds.cpu().tolist())
-                    y_prob.extend(probs.cpu().tolist())
-
-            print(
-                f"Epoch {epoch + 1}/{hyperparams.epochs} — Val Loss: {epoch_val_loss / len(val_loader):.4f}"
-            )
-
-            # Calculate metrics
-            avg_val_loss = epoch_val_loss / len(val_loader)
-            val_losses.append(avg_val_loss)
-
-            # Choose metric to display based on selected scoring metric
-            if scoring_metric == "f1":
-                score = f1_score(y_true, y_pred, average="weighted")
-            elif scoring_metric == "precision":
-                score = precision_score(y_true, y_pred, average="weighted")
-            elif scoring_metric == "recall":
-                score = recall_score(y_true, y_pred, average="weighted")
-            elif scoring_metric == "accuracy":
-                score = accuracy_score(y_true, y_pred)
-            elif scoring_metric == "roc_auc":
-                fpr, tpr, _ = roc_curve(y_true, y_prob)
-                score = auc(fpr, tpr)
-            elif scoring_metric == "pr_auc":
-                precision, recall, _ = precision_recall_curve(y_true, y_prob)
-                score = auc(recall, precision)
-            else:
-                score = f1_score(y_true, y_pred, average="weighted")  # Default to F1
-
-            # Print progress
-            print(
-                f"Epoch {epoch + 1}: Train Loss = {avg_train_loss:.4f}, "
-                f"Val Loss = {avg_val_loss:.4f}, {scoring_metric} = {score:.4f}"
-            )
-
-            # Save best model
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                current_best_model_state = model.state_dict().copy()
-                epochs_no_improve = 0
-            else:
-                epochs_no_improve += 1
-
-            # Early stopping
-            if hyperparams.early_stopping and epochs_no_improve >= hyperparams.patience:
-                print(f"Early stopping after {epoch + 1} epochs")
-                break
-
-        # Training time
-        training_time = time.time() - start_time
-
-        # Load best model for final evaluation
-        if current_best_model_state is not None:
-            model.load_state_dict(current_best_model_state)
-
-        # Final evaluation metrics
-        model.eval()
-        y_true, y_pred, y_prob = [], [], []
-
-        with torch.no_grad():
-            for seq_feats, char_feats, vector_feats, scalars, label in val_loader:
-                seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-                char_feats = {k: v.to(device) for k, v in char_feats.items()}
-                vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-                scalars = {k: v.to(device) for k, v in scalars.items()}
-                label = label.to(device)
-
-                logits = model(seq_feats, char_feats, vector_feats, scalars)
-                preds = torch.argmax(logits, dim=1)
-                probs = F.softmax(logits, dim=1)[:, 1]
-
-                y_true.extend(label.cpu().tolist())
-                y_pred.extend(preds.cpu().tolist())
-                y_prob.extend(probs.cpu().tolist())
-
-        # Calculate final metrics
-        accuracy = accuracy_score(y_true, y_pred)
-        precision = precision_score(y_true, y_pred, average="weighted")
-        recall = recall_score(y_true, y_pred, average="weighted")
-        f1 = f1_score(y_true, y_pred, average="weighted")
-
-        pr_precision, pr_recall, _ = precision_recall_curve(y_true, y_prob)
-        pr_auc_score = auc(pr_recall, pr_precision)
-
-        fpr, tpr, _ = roc_curve(y_true, y_prob)
-        roc_auc_score = auc(fpr, tpr)
-
-        cm = confusion_matrix(y_true, y_pred)
-
-        # Get model size
-        fd, path = tempfile.mkstemp()
-        os.close(fd)
-        torch.save(model.state_dict(), path)
-        size = os.path.getsize(path) / 1024  # KB
-        os.remove(path)
-
-        # Determine current score based on chosen metric
-        current_score = None
-        if scoring_metric == "f1":
-            current_score = f1
-        elif scoring_metric == "precision":
-            current_score = precision
-        elif scoring_metric == "recall":
-            current_score = recall
-        elif scoring_metric == "accuracy":
-            current_score = accuracy
-        elif scoring_metric == "roc_auc":
-            current_score = roc_auc_score
-        elif scoring_metric == "pr_auc":
-            current_score = pr_auc_score
-        else:
-            current_score = f1  # Default to F1 if invalid metric
-
-        # Check if this is the best model so far based on selected metric
-        if current_score > best_score:
-            best_score = current_score
-            best_model_state = current_best_model_state
-            best_fold_idx = fold_count
-            print(f"  * New best model: {scoring_metric.upper()}={current_score:.4f}")
-
-        # Save results
-        results["accuracy"].append(accuracy)
-        results["precision"].append(precision)
-        results["recall"].append(recall)
-        results["f1"].append(f1)
-        results["pr_auc"].append(pr_auc_score)
-        results["roc_auc"].append(roc_auc_score)
-        results["pr_curve_data"].append((pr_precision, pr_recall))
-        results["roc_curve_data"].append((fpr, tpr))
-        results["conf_matrices"].append(cm)
-        results["model_size"].append(size)
-        results["train_losses"].append(train_losses)
-        results["val_losses"].append(val_losses)
-        results["training_time"].append(training_time)
-        results["fold_info"].append(
+        aggregated_results["fold_info"].append(
             {
                 "repetition": current_rep,
-                "fold": current_fold,
-                "train_idx": train_idx,
-                "val_idx": val_idx,
-                "train_samples": len(train_idx),
-                "val_samples": len(val_idx),
+                "fold_in_rep": current_fold_in_rep,
+                "overall_fold": fold_counter,
+                "train_samples": len(train_df_fold),
+                "val_samples": len(val_df_fold),
+                "fold_score_metric": scoring_metric,
+                "fold_score_value": fold_final_metrics.get(scoring_metric, -1),
             }
         )
 
         print(
-            f"Fold {fold_count} results: F1={f1:.4f}, Accuracy={accuracy:.4f}, Precision={precision:.4f}, Recall={recall:.4f}, PR-AUC={pr_auc_score:.4f}, ROC-AUC={roc_auc_score:.4f}"
+            f"Fold {fold_counter} finished. Val {scoring_metric.capitalize()}: {fold_final_metrics.get(scoring_metric, 'N/A'):.4f} (from best model by val_loss within fold)"
         )
-        print(f"Training time: {training_time:.2f} seconds")
-        fold_count += 1
 
-    # Calculate means and standard deviations
-    print("\n=== Overall Results ===")
+        # Compare this fold's model (based on the specified scoring_metric on its val set)
+        # to find the overall best model across all folds
+        current_fold_score = fold_final_metrics.get(scoring_metric, -float("inf"))
+        if current_fold_score > overall_best_score:
+            overall_best_score = current_fold_score
+            overall_best_model_state = copy.deepcopy(
+                model_fold.state_dict()
+            )  # Save state of the best model
+            overall_best_scalers = copy.deepcopy(scalers_fold)
+            best_fold_info_str = f"Rep {current_rep}, Fold {current_fold_in_rep} (Overall Fold {fold_counter})"
+            print(
+                f"  *** New overall best model found based on {scoring_metric.upper()} across folds! Score: {overall_best_score:.4f} ***"
+            )
 
-    for metric in [
+        # Explicitly delete model and other large objects from the fold to free memory
+        del (
+            model_fold,
+            results_fold,
+            train_df_fold,
+            val_df_fold,
+            fold_final_metrics,
+            scalers_fold,
+        )
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+
+        gc.collect()
+
+    # Calculate mean and std for aggregated metrics
+    summary_metrics = {}
+    for key in [
         "accuracy",
         "precision",
         "recall",
         "f1",
-        "pr_auc",
         "roc_auc",
+        "pr_auc",
+        "val_loss",
         "model_size",
         "training_time",
     ]:
-        results[f"mean_{metric}"] = np.mean(results[metric], dtype=np.float64)
-        results[f"std_{metric}"] = np.std(results[metric], dtype=np.float64)
+        if aggregated_results.get(key) and len(aggregated_results.get(key)) > 0:
+            # Filter out None values that might have been appended
+            valid_values = [v for v in aggregated_results[key] if v is not None]
+            if valid_values:
+                aggregated_results[f"mean_{key}"] = np.mean(valid_values)
+                aggregated_results[f"std_{key}"] = np.std(valid_values)
+            else:
+                aggregated_results[f"mean_{key}"] = np.nan
+                aggregated_results[f"std_{key}"] = np.nan
+        else:
+            aggregated_results[f"mean_{key}"] = np.nan
+            aggregated_results[f"std_{key}"] = np.nan
 
-        print(
-            f"Mean {metric}: {results[f'mean_{metric}']:.4f} ± {results[f'std_{metric}']:.4f}"
-        )
+    aggregated_results["summary_metrics"] = summary_metrics
 
-    results["best_fold_idx"] = best_fold_idx
-    results["best_score"] = best_score
-    results["scoring_metric"] = scoring_metric
+    print("\n--- Overall Cross-Validation Summary ---")
+    for key, value in aggregated_results.items():
+        if key.startswith("mean_") or key.startswith("std_"):
+            print(f"{key.replace('_', ' ').capitalize()}: {value:.4f}")
 
     print(
-        f"Best model from fold {best_fold_idx} with {scoring_metric}={best_score:.4f}"
+        f"Best model across all folds (based on {scoring_metric.upper()} on validation set of its fold): {best_fold_info_str} with score {overall_best_score:.4f}"
     )
 
-    # Initialize best model with best weights
-    best_model = DebrimModel.from_config(
-        vocab_dict,
-        scalar_cols=scalar_cols,
-        sequence_cols=sequence_cols,
-        char_cols=char_cols,
-        vector_cols=vector_cols,
-        vector_dims=vector_dims,
-        embedding_dim=hyperparams.embedding_dim,
-        seq_pooling=hyperparams.seq_pooling,
-        hidden_dim=hyperparams.hidden_dims,
-        n_classes=hyperparams.n_classes,
-        dropout=hyperparams.dropout,
-    )
-    best_model.load_state_dict(best_model_state)
+    # Instantiate and load the overall best model
+    if overall_best_model_state:
+        print("Loading the overall best model state...")
+        best_model_overall = DebrimModel.from_config(
+            vocab_dict,
+            sequence_cols=sequence_cols,
+            scalar_cols=scalar_cols,
+            char_cols=char_cols,
+            vector_cols=vector_cols,
+            vector_dims=vector_dims,
+            embedding_dim=hyperparams.embedding_dim,
+            hidden_dim=hyperparams.hidden_dims,
+            seq_pooling=hyperparams.seq_pooling,
+            n_classes=hyperparams.n_classes,
+            dropout=hyperparams.dropout,
+        )
+        best_model_overall.load_state_dict(overall_best_model_state)
+        best_model_overall.to(device)  # Ensure it's on the correct device
+        best_model_overall.eval()
+    else:
+        print("Warning: No best model state was found during cross-validation.")
+        best_model_overall = None
+        overall_best_scalers = None
 
-    return results, best_model
-
-
-# def cross_val_train_nn_model(
-#     df: pd.DataFrame,
-#     vocab_dict: dict[str, Vocab],
-#     scalar_cols: list[str],
-#     char_cols: list[str],
-#     vector_cols: list[str],
-#     vector_dims: dict[str, int],
-#     hyperparams: NNHyperparams = NNHyperparams(),
-#     n_folds: int = 2,
-#     n_repetitions: int = 5,
-#     scoring_metric: Literal[
-#         "accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"
-#     ] = "f1",
-#     device: torch.device | None = None,
-#     random_seed: int = 42,
-# ) -> tuple[dict[str, Any], DebrimModel]:
-#     """
-#     Train a neural network model with cross-validation using the provided hyperparameters
-
-#     Parameters:
-#     -----------
-#     df : pandas.DataFrame
-#         The dataset containing features and labels
-#     vocab_dict : dict
-#         Dictionary of vocabularies for each feature column
-#     scalar_cols : list
-#         List of scalar columns to include
-#     char_cols : list
-#         List of columns to be processed character by character
-#     vector_cols : list
-#         List of columns containing fixed-length vectors
-#     vector_dims : dict
-#         Dictionary specifying the dimension of each vector feature
-#     hyperparams : NNHyperparams
-#         Dataclass containing hyperparameters for model training
-#     n_folds : int
-#         Number of folds for cross-validation
-#     n_repetitions : int
-#         Number of repetition rounds for cross-validation
-#     scoring_metric : str
-#         Primary metric to use for model evaluation and selection
-#         Options: "accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"
-#     device : torch.device or None
-#         Device to use (if None, will use best available device)
-#     random_seed : int
-#         Random seed for reproducibility
-
-#     Returns:
-#     --------
-#     tuple
-#         (results_dict, best_model)
-#     """
-#     import numpy as np
-#     import torch
-#     import torch.nn.functional as F
-#     from sklearn.model_selection import RepeatedStratifiedKFold
-#     from sklearn.utils.class_weight import compute_class_weight
-#     from sklearn.metrics import (
-#         accuracy_score,
-#         f1_score,
-#         precision_score,
-#         recall_score,
-#         auc,
-#         confusion_matrix,
-#         precision_recall_curve,
-#         roc_curve,
-#     )
-#     from torch.utils.data import DataLoader
-#     import tempfile
-#     import os
-#     import time
-
-#     # Check if GPU acceleration is available
-#     if device is None:
-#         device = get_best_available_device()
-
-#     print(f"Using device: {device}")
-#     print(f"Using {scoring_metric} as the primary scoring metric")
-
-#     # Prepare for repeated stratified k-fold
-#     X = np.arange(len(df))  # Just indices, actual features handled by Dataset
-#     y = df[hyperparams.label_col].values
-
-#     # Compute class weights for imbalanced data
-#     unique_classes = np.unique(y)
-#     class_weights = compute_class_weight(
-#         class_weight="balanced", classes=unique_classes, y=y
-#     )
-#     weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
-
-#     # Setup cross-validation
-#     rskf = RepeatedStratifiedKFold(
-#         n_splits=n_folds, n_repeats=n_repetitions, random_state=random_seed
-#     )
-
-#     # Convert hyperparams to dict for storing in results
-#     hyperparams_dict = {
-#         "batch_size": hyperparams.batch_size,
-#         "learning_rate": hyperparams.learning_rate,
-#         "epochs": hyperparams.epochs,
-#         "early_stopping": hyperparams.early_stopping,
-#         "patience": hyperparams.patience,
-#         "optimizer": hyperparams.optimizer,
-#         "weight_decay": hyperparams.weight_decay,
-#         "embedding_dim": hyperparams.embedding_dim,
-#         "hidden_dim": hyperparams.hidden_dims,
-#         "dropout": hyperparams.dropout,
-#         "seq_pooling": hyperparams.seq_pooling,
-#         "n_classes": hyperparams.n_classes,
-#         "label_col": hyperparams.label_col,
-#     }
-
-#     # Initialize results storage
-#     results = {
-#         "accuracy": [],
-#         "precision": [],
-#         "recall": [],
-#         "f1": [],
-#         "pr_auc": [],
-#         "roc_auc": [],
-#         "pr_curve_data": [],
-#         "roc_curve_data": [],
-#         "conf_matrices": [],
-#         "model_size": [],
-#         "train_losses": [],
-#         "val_losses": [],
-#         "training_time": [],
-#         "fold_info": [],
-#         "hyperparams": hyperparams_dict,
-#     }
-
-#     # Track the best model across all folds
-#     best_model = None
-#     best_score = -1  # Track best score for the selected metric
-#     best_model_state = None
-#     best_fold_idx = -1
-
-#     fold_count = 1
-#     # Iterate through repetitions and folds
-#     for rep_idx, (train_idx, val_idx) in enumerate(rskf.split(X, y)):
-#         # Calculate current repetition and fold
-#         current_rep = (rep_idx // n_folds) + 1
-#         current_fold = (rep_idx % n_folds) + 1
-
-#         print(
-#             f"\n=== Repetition {current_rep}/{n_repetitions}, Fold {current_fold}/{n_folds} ==="
-#         )
-
-#         # Split data
-#         train_df = df.iloc[train_idx].reset_index(drop=True)
-#         val_df = df.iloc[val_idx].reset_index(drop=True)
-
-#         # Check class distribution in splits
-#         print(
-#             f"Training set class distribution: {train_df[hyperparams.label_col].value_counts().to_dict()}"
-#         )
-#         print(
-#             f"Validation set class distribution: {val_df[hyperparams.label_col].value_counts().to_dict()}"
-#         )
-
-#         # Create datasets and loaders
-#         train_dataset = DebrimDataset(
-#             train_df,
-#             vocab_dict,
-#             scalar_cols=scalar_cols,
-#             char_cols=char_cols,
-#             vector_cols=vector_cols,
-#             label_col=hyperparams.label_col,
-#         )
-#         val_dataset = DebrimDataset(
-#             val_df,
-#             vocab_dict,
-#             scalar_cols=scalar_cols,
-#             char_cols=char_cols,
-#             vector_cols=vector_cols,
-#             label_col=hyperparams.label_col,
-#         )
-
-#         train_loader = DataLoader(
-#             train_dataset,
-#             batch_size=hyperparams.batch_size,
-#             shuffle=True,
-#             collate_fn=collate_fn,
-#         )
-#         val_loader = DataLoader(
-#             val_dataset,
-#             batch_size=hyperparams.batch_size,
-#             shuffle=False,
-#             collate_fn=collate_fn,
-#         )
-
-#         # Instantiate model with hyperparameters
-#         model = DebrimModel.from_config(
-#             vocab_dict,
-#             scalar_cols=scalar_cols,
-#             char_cols=char_cols,
-#             vector_cols=vector_cols,
-#             vector_dims=vector_dims,
-#             embedding_dim=hyperparams.embedding_dim,
-#             seq_pooling=hyperparams.seq_pooling,
-#             hidden_dim=hyperparams.hidden_dims,
-#             n_classes=hyperparams.n_classes,
-#             dropout=hyperparams.dropout,
-#         ).to(device)
-
-#         # Optimizer based on hyperparameters
-#         if hyperparams.optimizer == "adam":
-#             optimizer = torch.optim.Adam(
-#                 model.parameters(),
-#                 lr=hyperparams.learning_rate,
-#                 weight_decay=hyperparams.weight_decay,
-#             )
-#         elif hyperparams.optimizer == "adamw":
-#             optimizer = torch.optim.AdamW(
-#                 model.parameters(),
-#                 lr=hyperparams.learning_rate,
-#                 weight_decay=hyperparams.weight_decay,
-#             )
-#         elif hyperparams.optimizer == "sgd":
-#             optimizer = torch.optim.SGD(
-#                 model.parameters(),
-#                 lr=hyperparams.learning_rate,
-#                 weight_decay=hyperparams.weight_decay,
-#             )
-#         else:
-#             # Default to Adam if invalid optimizer specified
-#             optimizer = torch.optim.Adam(
-#                 model.parameters(),
-#                 lr=hyperparams.learning_rate,
-#                 weight_decay=hyperparams.weight_decay,
-#             )
-
-#         criterion = torch.nn.CrossEntropyLoss(weight=weights_tensor)
-
-#         # Training trackers
-#         best_val_loss = float("inf")
-#         current_best_model_state = None
-#         epochs_no_improve = 0
-#         train_losses, val_losses = [], []
-
-#         # Measure training time
-#         start_time = time.time()
-
-#         # Training loop
-#         for epoch in range(hyperparams.epochs):
-#             # Training phase
-#             model.train()
-#             epoch_train_loss = 0
-
-#             for seq_feats, char_feats, vector_feats, scalars, label in train_loader:
-#                 # Move batch data to device
-#                 seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-#                 char_feats = {k: v.to(device) for k, v in char_feats.items()}
-#                 vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-#                 scalars = {k: v.to(device) for k, v in scalars.items()}
-#                 label = label.to(device)
-
-#                 optimizer.zero_grad()
-#                 logits = model(seq_feats, char_feats, vector_feats, scalars)
-#                 loss = criterion(logits, label)
-#                 loss.backward()
-#                 optimizer.step()
-
-#                 epoch_train_loss += loss.item()
-
-#             avg_train_loss = epoch_train_loss / len(train_loader)
-#             train_losses.append(avg_train_loss)
-
-#             # Validation phase
-#             model.eval()
-#             epoch_val_loss = 0
-#             y_true, y_pred, y_prob = [], [], []
-
-#             with torch.no_grad():
-#                 for seq_feats, char_feats, vector_feats, scalars, label in val_loader:
-#                     # Move batch data to device
-#                     seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-#                     char_feats = {k: v.to(device) for k, v in char_feats.items()}
-#                     vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-#                     scalars = {k: v.to(device) for k, v in scalars.items()}
-#                     label = label.to(device)
-
-#                     logits = model(seq_feats, char_feats, vector_feats, scalars)
-#                     loss = criterion(logits, label)
-#                     epoch_val_loss += loss.item()
-
-#                     preds = torch.argmax(logits, dim=1)
-#                     probs = F.softmax(logits, dim=1)[
-#                         :, 1
-#                     ]  # Probability of positive class
-
-#                     y_true.extend(label.cpu().tolist())
-#                     y_pred.extend(preds.cpu().tolist())
-#                     y_prob.extend(probs.cpu().tolist())
-
-#             # Calculate metrics
-#             avg_val_loss = epoch_val_loss / len(val_loader)
-#             val_losses.append(avg_val_loss)
-
-#             # Choose metric to display based on selected scoring metric
-#             if scoring_metric == "f1":
-#                 score = f1_score(y_true, y_pred, average="weighted")
-#             elif scoring_metric == "precision":
-#                 score = precision_score(y_true, y_pred, average="weighted")
-#             elif scoring_metric == "recall":
-#                 score = recall_score(y_true, y_pred, average="weighted")
-#             elif scoring_metric == "accuracy":
-#                 score = accuracy_score(y_true, y_pred)
-#             elif scoring_metric == "roc_auc":
-#                 fpr, tpr, _ = roc_curve(y_true, y_prob)
-#                 score = auc(fpr, tpr)
-#             elif scoring_metric == "pr_auc":
-#                 precision, recall, _ = precision_recall_curve(y_true, y_prob)
-#                 score = auc(recall, precision)
-#             else:
-#                 score = f1_score(y_true, y_pred, average="weighted")  # Default to F1
-
-#             # Print progress
-#             print(
-#                 f"Epoch {epoch + 1}: Train Loss = {avg_train_loss:.4f}, "
-#                 f"Val Loss = {avg_val_loss:.4f}, {scoring_metric} = {score:.4f}"
-#             )
-
-#             # Save best model
-#             if avg_val_loss < best_val_loss:
-#                 best_val_loss = avg_val_loss
-#                 current_best_model_state = model.state_dict().copy()
-#                 epochs_no_improve = 0
-#             else:
-#                 epochs_no_improve += 1
-
-#             # Early stopping
-#             if hyperparams.early_stopping and epochs_no_improve >= hyperparams.patience:
-#                 print(f"Early stopping after {epoch + 1} epochs")
-#                 break
-
-#         # Training time
-#         training_time = time.time() - start_time
-
-#         # Load best model for final evaluation
-#         if current_best_model_state is not None:
-#             model.load_state_dict(current_best_model_state)
-
-#         # Final evaluation metrics
-#         model.eval()
-#         y_true, y_pred, y_prob = [], [], []
-
-#         with torch.no_grad():
-#             for seq_feats, char_feats, vector_feats, scalars, label in val_loader:
-#                 # Move batch data to device
-#                 seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
-#                 char_feats = {k: v.to(device) for k, v in char_feats.items()}
-#                 vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
-#                 scalars = {k: v.to(device) for k, v in scalars.items()}
-#                 label = label.to(device)
-
-#                 logits = model(seq_feats, char_feats, vector_feats, scalars)
-#                 preds = torch.argmax(logits, dim=1)
-#                 probs = F.softmax(logits, dim=1)[:, 1]
-
-#                 y_true.extend(label.cpu().tolist())
-#                 y_pred.extend(preds.cpu().tolist())
-#                 y_prob.extend(probs.cpu().tolist())
-
-#         # Calculate final metrics
-#         accuracy = accuracy_score(y_true, y_pred)
-#         precision = precision_score(y_true, y_pred, average="weighted")
-#         recall = recall_score(y_true, y_pred, average="weighted")
-#         f1 = f1_score(y_true, y_pred, average="weighted")
-
-#         pr_precision, pr_recall, _ = precision_recall_curve(y_true, y_prob)
-#         pr_auc_score = auc(pr_recall, pr_precision)
-
-#         fpr, tpr, _ = roc_curve(y_true, y_prob)
-#         roc_auc_score = auc(fpr, tpr)
-
-#         cm = confusion_matrix(y_true, y_pred)
-
-#         # Get model size
-#         fd, path = tempfile.mkstemp()
-#         os.close(fd)
-#         torch.save(model.state_dict(), path)
-#         size = os.path.getsize(path) / 1024  # KB
-#         os.remove(path)
-
-#         # Determine current score based on chosen metric
-#         current_score = None
-#         if scoring_metric == "f1":
-#             current_score = f1
-#         elif scoring_metric == "precision":
-#             current_score = precision
-#         elif scoring_metric == "recall":
-#             current_score = recall
-#         elif scoring_metric == "accuracy":
-#             current_score = accuracy
-#         elif scoring_metric == "roc_auc":
-#             current_score = roc_auc_score
-#         elif scoring_metric == "pr_auc":
-#             current_score = pr_auc_score
-#         else:
-#             current_score = f1  # Default to F1 if invalid metric
-
-#         # Check if this is the best model so far based on selected metric
-#         if current_score > best_score:
-#             best_score = current_score
-#             best_model_state = current_best_model_state
-#             best_fold_idx = fold_count
-#             print(f"  * New best model: {scoring_metric.upper()}={current_score:.4f}")
-
-#         # Save results
-#         results["accuracy"].append(accuracy)
-#         results["precision"].append(precision)
-#         results["recall"].append(recall)
-#         results["f1"].append(f1)
-#         results["pr_auc"].append(pr_auc_score)
-#         results["roc_auc"].append(roc_auc_score)
-#         results["pr_curve_data"].append((pr_precision, pr_recall))
-#         results["roc_curve_data"].append((fpr, tpr))
-#         results["conf_matrices"].append(cm)
-#         results["model_size"].append(size)
-#         results["train_losses"].append(train_losses)
-#         results["val_losses"].append(val_losses)
-#         results["training_time"].append(training_time)
-#         results["fold_info"].append(
-#             {
-#                 "repetition": current_rep,
-#                 "fold": current_fold,
-#                 "train_idx": train_idx,
-#                 "val_idx": val_idx,
-#                 "train_samples": len(train_idx),
-#                 "val_samples": len(val_idx),
-#             }
-#         )
-
-#         print(
-#             f"Fold {fold_count} results: F1={f1:.4f}, Accuracy={accuracy:.4f}, Precision={precision:.4f}, Recall={recall:.4f}, PR-AUC={pr_auc_score:.4f}, ROC-AUC={roc_auc_score:.4f}"
-#         )
-#         print(f"Training time: {training_time:.2f} seconds")
-#         fold_count += 1
-
-#     # Calculate means and standard deviations
-#     print("\n=== Overall Results ===")
-
-#     for metric in [
-#         "accuracy",
-#         "precision",
-#         "recall",
-#         "f1",
-#         "pr_auc",
-#         "roc_auc",
-#         "model_size",
-#         "training_time",
-#     ]:
-#         results[f"mean_{metric}"] = np.mean(results[metric], dtype=np.float64)
-#         results[f"std_{metric}"] = np.std(results[metric], dtype=np.float64)
-
-#         print(
-#             f"Mean {metric}: {results[f'mean_{metric}']:.4f} ± {results[f'std_{metric}']:.4f}"
-#         )
-
-#     results["best_fold_idx"] = best_fold_idx
-#     results["best_score"] = best_score
-#     results["scoring_metric"] = scoring_metric
-
-#     print(
-#         f"Best model from fold {best_fold_idx} with {scoring_metric}={best_score:.4f}"
-#     )
-
-#     # Initialize best model with best weights
-#     best_model = DebrimModel.from_config(
-#         vocab_dict,
-#         scalar_cols=scalar_cols,
-#         char_cols=char_cols,
-#         vector_cols=vector_cols,
-#         vector_dims=vector_dims,
-#         embedding_dim=hyperparams.embedding_dim,
-#         seq_pooling=hyperparams.seq_pooling,
-#         hidden_dim=hyperparams.hidden_dims,
-#         n_classes=hyperparams.n_classes,
-#         dropout=hyperparams.dropout,
-#     )
-#     best_model.load_state_dict(best_model_state)
-
-#     return results, best_model
+    return best_model_overall, aggregated_results, overall_best_scalers
 
 
 def predict(
     model: DebrimModel,
     df: pd.DataFrame,
-    vocab_dict: dict[str, Vocab],
+    scalers: dict[str, StandardScaler],
     scalar_cols: list[str],
     char_cols: list[str],
     vector_cols: list[str],
@@ -1918,30 +1423,33 @@ def predict(
         List of columns to be processed character by character
     vector_cols : list
         List of columns containing fixed-length vectors
-    device : torch.device or None
+    device : torch.device | None
         Device to run inference on
     batch_size : int
         Batch size for prediction
     label_col : str
         Name of the label column
+    scalers : dict[str, StandardScaler] | None
+        Pre-fitted scalers for normalizing scalar and vector columns
 
     Returns
     -------
     tuple
         (predictions, probabilities)
     """
-    # Check for device
     if device is None:
         device = get_best_available_device()
 
-    # Prepare model for inference
     model = model.to(device)
     model.eval()
 
-    # Create dataset and dataloader
+    df_processed, _ = apply_scalers_to_dataframe(
+        df, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
+    )
+
     dataset = DebrimDataset(
-        df,
-        vocab_dict,
+        df_processed,
+        sequence_cols=None,
         scalar_cols=scalar_cols,
         char_cols=char_cols,
         vector_cols=vector_cols,
@@ -1955,21 +1463,17 @@ def predict(
     all_preds = []
     all_probs = []
 
-    # Perform inference in batches
     with torch.no_grad():
         for seq_feats, char_feats, vector_feats, scalars, _ in loader:
-            # Move batch data to device
             seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
             char_feats = {k: v.to(device) for k, v in char_feats.items()}
             vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
             scalars = {k: v.to(device) for k, v in scalars.items()}
 
-            # Get model outputs
             logits = model(seq_feats, char_feats, vector_feats, scalars)
             probs = torch.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)
 
-            # Move results back to CPU and convert to Python objects
             all_preds.extend(preds.cpu().tolist())
             all_probs.extend(probs.cpu().tolist())
 
@@ -1979,7 +1483,7 @@ def predict(
 def extract_embeddings(
     model: DebrimModel | DebrimEmbedder,
     df: pd.DataFrame,
-    vocab_dict: dict[str, Vocab],
+    scalers: dict[str, StandardScaler],
     sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
@@ -2011,47 +1515,201 @@ def extract_embeddings(
         Batch size for processing
     label_col : str
         Name of the label column
+    scalers : dict[str, StandardScaler] | None
+        Pre-fitted scalers for normalizing scalar and vector columns
 
     Returns
     -------
     tuple
         (embeddings, labels)
     """
+    if device is None:
+        device = get_best_available_device()
+
+    model.to(device)
     model.eval()
 
-    # Create dataset and dataloader
+    df_processed, _ = apply_scalers_to_dataframe(
+        df, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
+    )
+
     dataset = DebrimDataset(
-        df,
-        vocab_dict,
-        scalar_cols=scalar_cols,
+        df_processed,
         sequence_cols=sequence_cols,
         char_cols=char_cols,
         vector_cols=vector_cols,
+        scalar_cols=scalar_cols,
         label_col=label_col,
     )
-
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
     )
 
     all_embeddings = []
     all_labels = []
-
-    # Determine whether we're using a full model or just the embedder
     embedder = model.embedder if isinstance(model, DebrimModel) else model
 
     with torch.no_grad():
         for seq_feats, char_feats, vector_feats, scalars, labels in loader:
-            # Move batch data to device
             seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
             char_feats = {k: v.to(device) for k, v in char_feats.items()}
             vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
             scalars = {k: v.to(device) for k, v in scalars.items()}
 
-            # Get embeddings directly from the embedder component
+            # Get embeddings from the embedder component
             embeddings, _ = embedder(seq_feats, char_feats, vector_feats, scalars)
 
-            all_embeddings.append(embeddings.cpu().numpy())
-            all_labels.append(labels.cpu().numpy())
+            # Also include the original scalar features in the final "embedding" vector
+            if scalar_cols and scalars:
+                scalar_tensors = [scalars[col] for col in scalar_cols if col in scalars]
+                if scalar_tensors:
+                    scalar_tensor = torch.cat(scalar_tensors, dim=1)
+                    final_embeddings = torch.cat([embeddings, scalar_tensor], dim=1)
+                else:
+                    final_embeddings = embeddings
+            else:
+                final_embeddings = embeddings
+
+            all_embeddings.append(final_embeddings.cpu().tolist())
+            all_labels.append(labels.cpu().tolist())
 
     return np.vstack(all_embeddings), np.concatenate(all_labels)
+
+
+def evaluate_model_on_test_set(
+    model: DebrimModel,
+    df_test: pd.DataFrame,
+    scalers: dict[str, StandardScaler],
+    sequence_cols: list[str],
+    scalar_cols: list[str],
+    char_cols: list[str],
+    vector_cols: list[str],
+    hyperparams: NNHyperparams,
+    device: torch.device | None = None,
+) -> dict[str, Any]:
+    """
+    Evaluates a trained DebrimModel on a completely unseen test set.
+
+    Parameters
+    ----------
+    model : DebrimModel
+        The trained model to evaluate
+    df_test : pandas.DataFrame
+        The test dataset containing features and labels
+    scalers : dict[str, StandardScaler]
+        Pre-fitted scalers for normalizing scalar and vector columns
+    sequence_cols : list[str]
+        List of sequence columns to include
+    scalar_cols : list[str]
+        List of scalar columns to include
+    char_cols : list[str]
+        List of columns to be processed character by character
+    vector_cols : list[str]
+        List of columns containing fixed-length vectors
+    vector_dims : dict[str, int]
+        Dictionary mapping vector column names to their dimensions
+    hyperparams : NNHyperparams
+        Hyperparameters for the model, including label_col and batch_size
+    device : torch.device or None
+        Device to run evaluation on (if None, will use best available device)
+
+    Returns
+    -------
+    dict
+        A dictionary containing evaluation metrics and results.
+    """
+
+    if device is None:
+        device = get_best_available_device()
+
+    model.to(device)
+    model.eval()
+
+    print("--- Evaluating on Test Set ---")
+
+    df_test_processed, _ = apply_scalers_to_dataframe(
+        df_test, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
+    )
+
+    test_dataset = DebrimDataset(
+        df_test_processed,
+        sequence_cols=sequence_cols,
+        scalar_cols=scalar_cols,
+        char_cols=char_cols,
+        vector_cols=vector_cols,
+        label_col=hyperparams.label_col,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=hyperparams.batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        num_workers=hyperparams.dataloader_num_workers,
+        pin_memory=hyperparams.dataloader_pin_memory
+        if device.type == "cuda"
+        else False,
+    )
+
+    all_labels_test = []
+    all_preds_test = []
+    all_probs_test = []
+
+    with torch.no_grad():
+        for seq_feats, char_feats, vector_feats, scalars, labels in test_loader:
+            seq_feats = {k: v.to(device) for k, v in seq_feats.items()}
+            char_feats = {k: v.to(device) for k, v in char_feats.items()}
+            vector_feats = {k: v.to(device) for k, v in vector_feats.items()}
+            scalars = {k: v.to(device) for k, v in scalars.items()}
+
+            with autocast(enabled=(device.type == "cuda")):
+                logits = model(seq_feats, char_feats, vector_feats, scalars)
+
+            preds = torch.argmax(logits, dim=1)
+            probs = torch.softmax(logits, dim=1)[:, 1]
+
+            all_labels_test.extend(labels.cpu().tolist())
+            all_preds_test.extend(preds.cpu().tolist())
+            all_probs_test.extend(probs.cpu().tolist())
+
+    # Calculate metrics
+    y_true = np.array(all_labels_test)
+    y_pred = np.array(all_preds_test)
+    y_prob = np.array(all_probs_test)
+
+    test_metrics = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "precision_binary": precision_score(
+            y_true, y_pred, average="binary", zero_division=0
+        ),
+        "recall_binary": recall_score(
+            y_true, y_pred, average="binary", zero_division=0
+        ),
+        "f1_binary": f1_score(y_true, y_pred, average="binary", zero_division=0),
+        "precision_weighted": precision_score(
+            y_true, y_pred, average="weighted", zero_division=0
+        ),
+        "recall_weighted": recall_score(
+            y_true, y_pred, average="weighted", zero_division=0
+        ),
+        "f1_weighted": f1_score(y_true, y_pred, average="weighted", zero_division=0),
+        "confusion_matrix": confusion_matrix(y_true, y_pred).tolist(),
+        "classification_report": classification_report(
+            y_true, y_pred, output_dict=True, zero_division=0
+        ),
+    }
+    if len(np.unique(y_true)) > 1:
+        test_metrics["roc_auc"] = roc_auc_score(y_true, y_prob)
+        test_metrics["pr_auc"] = average_precision_score(y_true, y_prob)
+    else:
+        test_metrics["roc_auc"] = np.nan
+        test_metrics["pr_auc"] = np.nan
+
+    print("\n--- Test Set Evaluation Metrics ---")
+    for metric_name, metric_value in test_metrics.items():
+        if isinstance(metric_value, float) or isinstance(metric_value, int):
+            print(f"  {metric_name.replace('_', ' ').capitalize()}: {metric_value:.4f}")
+        elif metric_name == "confusion_matrix":
+            print(f"  Confusion Matrix:\n{np.array(metric_value)}")
+    print("---------------------------------")
+
+    return test_metrics
