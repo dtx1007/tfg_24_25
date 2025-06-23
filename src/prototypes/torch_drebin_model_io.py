@@ -6,7 +6,7 @@ import numpy as np
 from dataclasses import asdict
 from datetime import datetime
 
-from prototypes.torch_debrin_model import (
+from .torch_debrin_model import (
     DebrimModel,
     DebrimEmbedder,
     NNHyperparams,

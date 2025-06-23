@@ -35,7 +35,7 @@ from sklearn.metrics import (
     classification_report,
 )
 
-from utils.preprocessing_utils import apply_scalers_to_dataframe
+from ..utils.preprocessing_utils import apply_scalers_to_dataframe
 
 
 @dataclass(frozen=True)
@@ -1427,6 +1427,7 @@ def predict(
     model: APKAnalysisModel,
     df: pd.DataFrame,
     scalers: dict[str, StandardScaler],
+    sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
     vector_cols: list[str],
@@ -1477,7 +1478,7 @@ def predict(
 
     dataset = ApkAnalysisDataset(
         df_processed,
-        sequence_cols=None,
+        sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
         char_cols=char_cols,
         vector_cols=vector_cols,

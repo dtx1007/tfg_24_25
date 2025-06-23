@@ -8,7 +8,7 @@ import numpy as np
 from dataclasses import asdict
 from datetime import datetime
 
-from prototypes.torch_apk_analysis_model import (
+from .torch_apk_analysis_model import (
     APKAnalysisModel,
     APKFeatureEmbedder,
     NNHyperparams,
@@ -94,7 +94,7 @@ def save_model_with_metadata(
         "model_architecture": {
             "embedder_output_dim": model.embedder.output_dim,
             "classifier_input_dim": model.classifier.input_dim,
-            "scalar_features": model.scalar_dim,
+            "scalar_features": model.embedder.scalar_cols,
             "sequence_cols": model.embedder.sequence_cols,
             "char_cols": model.embedder.char_cols,
             "vector_cols": model.embedder.vector_cols,
@@ -284,20 +284,26 @@ def load_apk_analysis_model_from_version(
     vector_cols = model_arch.get("vector_cols", [])
     vector_dims = model_arch.get("vector_dims", {})
 
-    # Determine scalar_cols list for from_config based on scalar_dim
-    # The actual names are not stored with the model, only the count.
-    # For model re-instantiation, we only need the count for the classifier's input_dim.
-    # The actual scalar column names would be needed by the user when preparing data.
-    scalar_dim = model_arch.get("scalar_features", 0)
-    # Create a placeholder list for scalar_cols for from_config
-    # The actual names are not strictly needed for model instantiation if only count is used for input_dim
-    instantiation_scalar_cols = [f"scalar_{i}" for i in range(scalar_dim)]
+    # Handle scalar_features metadata, which could be a list of names (new format) or a count (old format).
+    scalar_features_meta = model_arch.get("scalar_features", [])
+    if isinstance(scalar_features_meta, int):
+        print(
+            "Warning: Loading model with old metadata format (scalar feature count only)."
+        )
+        instantiation_scalar_cols = [f"scalar_{i}" for i in range(scalar_features_meta)]
+    elif isinstance(scalar_features_meta, list):
+        instantiation_scalar_cols = scalar_features_meta
+    else:
+        print(
+            f"Warning: 'scalar_features' in metadata is of unexpected type: {type(scalar_features_meta)}. Assuming no scalar features."
+        )
+        instantiation_scalar_cols = []
 
     # Create model with the right architecture including new parameters
     model = APKAnalysisModel.from_config(
         vocab_dict=vocab_dict,
         sequence_cols=sequence_cols,
-        scalar_cols=instantiation_scalar_cols,  # Pass the list of placeholder names
+        scalar_cols=instantiation_scalar_cols,  # Pass the list of names
         char_cols=char_cols,
         vector_cols=vector_cols,
         vector_dims=vector_dims,

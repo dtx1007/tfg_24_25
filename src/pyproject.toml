@@ -13,7 +13,7 @@ torch     = [
     {version = "2.3.0", source="torchcpu", markers = "sys_platform == 'linux' and extra == 'cpu' and extra != 'gpu'"},
     {version = "2.3.0", source="torchcpu", markers = "sys_platform == 'win32' and extra == 'cpu' and extra != 'gpu'"},
 ]
-numpy         = "^2.3.0"
+numpy         = "2.2.6"
 pandas        = "^2.3.0"
 scikit-learn  = "^1.7.0"
 matplotlib    = "^3.10.3"
@@ -23,6 +23,11 @@ androguard    = "^4.1.3"
 ppdeep        = "^20200505"
 python-dotenv = "^1.1.0"
 optuna = "^4.3.0"
+streamlit = "^1.46.0"
+lime = "^0.2.0.1"
+numba = "^0.61.2"
+shap = "^0.48.0"
+umap-learn = "^0.5.7"
 
 [[tool.poetry.source]]
 name     = "torchcpu"

@@ -9,7 +9,7 @@ from pathlib import Path
 from torchtext.vocab import Vocab
 from sklearn.preprocessing import StandardScaler
 
-from utils.vocab_utils import create_vocab_for_column, create_char_vocab
+from .vocab_utils import create_vocab_for_column, create_char_vocab
 
 
 def _calculate_max_lengths(df, sequence_cols, char_cols):
@@ -37,6 +37,7 @@ def preprocess_data_for_nn(
     vector_cols: list[str],
     scalar_cols: list[str],
     vector_dims: dict[str, int],
+    vocab_dict: dict[str, Vocab] | None = None,
     max_lengths: dict[str, int] | None = None,
     pad_token: str = "<PAD>",
     unk_token: str = "<UNK>",
@@ -46,11 +47,12 @@ def preprocess_data_for_nn(
     Comprehensive preprocessing for APK dataset for the APKAnalysisModel.
     Handles:
     1. Parsing string representations of lists and vectors.
-    2. Creating vocabularies for sequence and character features.
-    3. Converting character strings (e.g., hashes) to lists of indices.
-    4. Tokenizing sequence features (lists of strings) to lists of indices.
-    5. Padding all sequence and character features to specified max_lengths.
-    6. Ensuring scalar features are numeric.
+    2. Creating vocabularies for sequence and character features if not provided.
+    3. Using existing vocabularies to tokenize features.
+    4. Converting character strings (e.g., hashes) to lists of indices.
+    5. Tokenizing sequence features (lists of strings) to lists of indices.
+    6. Padding all sequence and character features to specified max_lengths.
+    7. Ensuring scalar features are numeric.
     """
     df = df_raw.copy()
 
@@ -111,30 +113,36 @@ def preprocess_data_for_nn(
         print("Calculated max lengths for sequence and char columns:")
         pp.pprint(max_lengths)
 
-    # 3. Create vocabularies
-    vocab_dict = {}
-    specials = [pad_token, unk_token, empty_token]
+    # 3. Create vocabularies if not provided
+    if vocab_dict is None:
+        print("No vocab_dict provided, creating new vocabularies...")
+        vocab_dict = {}
+        specials = [pad_token, unk_token, empty_token]
 
-    # Vocabs for SEQUENCE_FEATURES
-    for col in sequence_cols:
-        if col in df.columns:
-            vocab_dict[col] = create_vocab_for_column(df, col, specials=specials)
-            print(
-                f"Created vocab for sequence column: {col}, size: {len(vocab_dict[col])}"
-            )
+        # Vocabs for SEQUENCE_FEATURES
+        for col in sequence_cols:
+            if col in df.columns:
+                vocab_dict[col] = create_vocab_for_column(df, col, specials=specials)
+                print(
+                    f"Created vocab for sequence column: {col}, size: {len(vocab_dict[col])}"
+                )
 
-    # Vocabs for CHAR_COLS
-    all_defined_chars = (
-        string.ascii_lowercase + string.ascii_uppercase + string.digits + "+/"
-    )
-    generic_char_vocab = create_char_vocab(set(all_defined_chars), specials=specials)
+        # Vocabs for CHAR_COLS
+        all_defined_chars = (
+            string.ascii_lowercase + string.ascii_uppercase + string.digits + "+/"
+        )
+        generic_char_vocab = create_char_vocab(
+            set(all_defined_chars), specials=specials
+        )
 
-    for col in char_cols:
-        if col in df.columns:
-            vocab_dict[col] = generic_char_vocab
-            print(
-                f"Using generic char vocab for char column: {col}, size: {len(vocab_dict[col])}"
-            )
+        for col in char_cols:
+            if col in df.columns:
+                vocab_dict[col] = generic_char_vocab
+                print(
+                    f"Using generic char vocab for char column: {col}, size: {len(vocab_dict[col])}"
+                )
+    else:
+        print("Using provided vocab_dict for tokenization.")
 
     # 4. Convert CHAR_COLS strings to lists of indices
     def convert_string_to_indices(text_str, vocab, unk_t, empty_t):
@@ -199,29 +207,25 @@ def preprocess_data_for_nn(
                     f"pad_token '{pad_token}' not found in vocab for char column: {col}"
                 )
 
-            padded_char_sequences = []
+            padded_sequences = []
             for indices in df[col]:
                 padding_needed = max_len - len(indices)
                 if padding_needed > 0:
                     padded_indices = indices + [pad_idx] * padding_needed
                 else:
                     padded_indices = indices[:max_len]
-                padded_char_sequences.append(padded_indices)
-            df[col] = padded_char_sequences
+                padded_sequences.append(padded_indices)
+            df[col] = padded_sequences
         else:
             print(
                 f"Warning: Char column {col} not found in DataFrame or vocab_dict for padding."
             )
 
-    # 7. Ensure SCALAR_COLS are numeric
+    # 7. Ensure SCALAR_FEATURES are numeric
     for col in scalar_cols:
         if col in df.columns:
-            df[col] = (
-                pd.to_numeric(df[col], errors="coerce").fillna(0.0).astype(float)
-            )  # Ensure float for model
-            print(f"Processed scalar column: {col}")
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    print("Comprehensive preprocessing complete.")
     return df, vocab_dict
 
 
