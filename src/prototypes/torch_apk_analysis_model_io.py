@@ -8,9 +8,9 @@ import numpy as np
 from dataclasses import asdict
 from datetime import datetime
 
-from torch_nn_model_2 import (
-    DebrimModel,
-    DebrimEmbedder,
+from prototypes.torch_apk_analysis_model import (
+    APKAnalysisModel,
+    APKFeatureEmbedder,
     NNHyperparams,
     get_best_available_device,
 )
@@ -40,7 +40,7 @@ def _convert_numpy_to_list(data: Any) -> Any:
 
 
 def save_model_with_metadata(
-    model: DebrimModel,
+    model: APKAnalysisModel,
     vocab_dict: dict[str, Vocab],
     hyperparams: NNHyperparams,
     scalers: dict[str, StandardScaler],
@@ -56,9 +56,9 @@ def save_model_with_metadata(
 
     paths = {
         "model_dir": model_dir,
-        "full_model": os.path.join(model_dir, "debrim_model.pt"),
-        "embedder": os.path.join(model_dir, "debrim_embedder.pt"),
-        "classifier": os.path.join(model_dir, "debrim_classifier.pt"),
+        "full_model": os.path.join(model_dir, "apk_analysis_model.pt"),
+        "embedder": os.path.join(model_dir, "apk_feature_embedder.pt"),
+        "classifier": os.path.join(model_dir, "apk_classifier.pt"),
         "vocab": os.path.join(model_dir, "vocab_dict.pkl"),
         "scalers": os.path.join(model_dir, "scalers.joblib"),
         "hyperparams": os.path.join(model_dir, "hyperparams.json"),
@@ -88,7 +88,7 @@ def save_model_with_metadata(
     # Prepare metadata about the model architecture
     metadata = {
         "timestamp": timestamp,
-        "model_type": "DebrimModel",
+        "model_type": "APKAnalysisModel",
         "pytorch_version": torch.__version__,
         "feature_count": len(vocab_dict),
         "model_architecture": {
@@ -108,22 +108,18 @@ def save_model_with_metadata(
         json.dump(metadata, f, indent=2)
 
     if results:
-        all_metrics = _convert_numpy_to_list(results)
+        all_metrics = _convert_numpy_to_list(results.copy())
 
-        # Create the 'summary_metrics' dict by extracting mean_ and std_ keys for CV results,
-        # or by using the 'final_metrics_best_model' for single-run results.
         summary_metrics = {
             key: value
             for key, value in all_metrics.items()
             if key.startswith("mean_") or key.startswith("std_")
         }
 
-        # If no mean/std keys were found, it's likely a single run, so use its final metrics.
-        if not summary_metrics and "final_metrics_best_model" in all_metrics:
-            summary_metrics = all_metrics["final_metrics_best_model"]
-
         with open(paths["summary_metrics"], "w") as f:
             json.dump(summary_metrics, f, indent=2)
+
+        all_metrics.pop("hyperparams", None)
 
         with open(paths["all_metrics"], "w") as f:
             json.dump(all_metrics, f, indent=2)
@@ -218,7 +214,7 @@ def _load_model_metadata(model_dir: str) -> dict[str, Any]:
     return metadata
 
 
-def load_debrim_metadata(
+def load_apk_analysis_model_metadata(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
 ) -> dict[str, Any]:
@@ -229,13 +225,15 @@ def load_debrim_metadata(
     return _load_model_metadata(model_dir)
 
 
-def load_debrim_model_from_version(
+def load_apk_analysis_model_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimModel, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]]:
+) -> tuple[
+    APKAnalysisModel, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]
+]:
     """
-    Load a complete DebrimModel, its vocabulary, scalers, and metadata from a specific version directory.
+    Load a complete APKAnalysisModel, its vocabulary, scalers, and metadata from a specific version directory.
     Returns:
     --------
     tuple
@@ -245,9 +243,9 @@ def load_debrim_model_from_version(
         device = get_best_available_device()
 
     model_dir = _resolve_model_directory(version, base_dir)
-    model_path = os.path.join(model_dir, "debrim_model.pt")
+    model_path = os.path.join(model_dir, "apk_analysis_model.pt")
     vocab_path = os.path.join(model_dir, "vocab_dict.pkl")
-    scalers_path = os.path.join(model_dir, "scalers.joblib")  # Path for scalers
+    scalers_path = os.path.join(model_dir, "scalers.joblib")
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -296,7 +294,7 @@ def load_debrim_model_from_version(
     instantiation_scalar_cols = [f"scalar_{i}" for i in range(scalar_dim)]
 
     # Create model with the right architecture including new parameters
-    model = DebrimModel.from_config(
+    model = APKAnalysisModel.from_config(
         vocab_dict=vocab_dict,
         sequence_cols=sequence_cols,
         scalar_cols=instantiation_scalar_cols,  # Pass the list of placeholder names
@@ -319,11 +317,13 @@ def load_debrim_model_from_version(
     return model, vocab_dict, loaded_scalers, metadata
 
 
-def load_debrim_embedder_from_version(
+def load_apk_feature_embedder_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimEmbedder, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]]:
+) -> tuple[
+    APKFeatureEmbedder, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]
+]:
     """
     Load only the embedder component, vocab, scalers (if present), and metadata from a specific version directory.
     """
@@ -331,7 +331,7 @@ def load_debrim_embedder_from_version(
         device = get_best_available_device()
 
     model_dir = _resolve_model_directory(version, base_dir)
-    embedder_path = os.path.join(model_dir, "debrim_embedder.pt")
+    embedder_path = os.path.join(model_dir, "apk_feature_embedder.pt")
     vocab_path = os.path.join(model_dir, "vocab_dict.pkl")
     scalers_path = os.path.join(model_dir, "scalers.joblib")
 
@@ -370,7 +370,7 @@ def load_debrim_embedder_from_version(
     vector_dims = model_arch.get("vector_dims", {})
 
     # Create embedder with updated architecture
-    embedder = DebrimEmbedder(
+    embedder = APKFeatureEmbedder(
         vocab_dict=vocab_dict,
         sequence_cols=sequence_cols,
         embedding_dim=embedding_dim,

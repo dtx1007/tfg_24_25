@@ -2,11 +2,14 @@ import pandas as pd
 import pprint as pp
 import numpy as np
 import string
+import torch
+
+from pathlib import Path
 
 from torchtext.vocab import Vocab
 from sklearn.preprocessing import StandardScaler
 
-from vocab_utils import create_vocab_for_column, create_char_vocab
+from utils.vocab_utils import create_vocab_for_column, create_char_vocab
 
 
 def _calculate_max_lengths(df, sequence_cols, char_cols):
@@ -40,7 +43,7 @@ def preprocess_data_for_nn(
     empty_token: str = "<EMPTY>",
 ) -> tuple[pd.DataFrame, dict[str, Vocab]]:
     """
-    Comprehensive preprocessing for APK dataset for the Debrim Neural Network.
+    Comprehensive preprocessing for APK dataset for the APKAnalysisModel.
     Handles:
     1. Parsing string representations of lists and vectors.
     2. Creating vocabularies for sequence and character features.
@@ -268,3 +271,59 @@ def apply_scalers_to_dataframe(
                     scaled_vectors = scalers_used[col].transform(vectors)
                     df_processed[col] = [list(vec) for vec in scaled_vectors]
     return df_processed, scalers_used
+
+
+def load_dataset(
+    path_to_dataset_dir: Path | str,
+    sequence_cols: list[str],
+    char_cols: list[str],
+    vector_cols: list[str],
+    scalar_cols: list[str],
+    vector_dims: dict[str, int],
+    load_fresh: bool = False,
+    sample_size: int | None = None,
+):
+    """
+    Load the dataset, optionally reloading it fresh.
+    """
+    PATH_TO_DATASET_DIR = Path(path_to_dataset_dir)
+    PATH_TO_DATASET = PATH_TO_DATASET_DIR / "apk_analysis_dataset.csv"
+    PATH_TO_PROCESSED_DATASET = (
+        PATH_TO_DATASET_DIR / "processed_apk_analysis_dataset.pkl"
+    )
+    PATH_TO_VOCAB_DICT = PATH_TO_DATASET_DIR / "processed_vocab_dict.pth"
+
+    if not PATH_TO_DATASET_DIR.exists():
+        print(f"Creating dataset directory at {PATH_TO_DATASET_DIR}")
+        PATH_TO_DATASET_DIR.mkdir(parents=True, exist_ok=True)
+
+    if load_fresh:
+        print("Loading dataset fresh...")
+        df = pd.read_csv(PATH_TO_DATASET)
+
+        if sample_size is not None:
+            print(f"Sampling {sample_size} rows from the dataset...")
+            df = df.sample(sample_size, random_state=42)
+
+        df, vocab_dict = preprocess_data_for_nn(
+            df,
+            sequence_cols=sequence_cols,
+            char_cols=char_cols,
+            vector_cols=vector_cols,
+            scalar_cols=scalar_cols,
+            vector_dims=vector_dims,
+        )
+
+        print("Saving preprocessed dataset and vocab_dict...")
+
+        df.to_pickle(PATH_TO_PROCESSED_DATASET)
+        torch.save(vocab_dict, PATH_TO_VOCAB_DICT)
+
+        print("Preprocessing complete and saved.")
+
+    else:
+        print("Loading last preprocessed dataset...")
+        df = pd.read_pickle(PATH_TO_PROCESSED_DATASET)
+        vocab_dict = torch.load(PATH_TO_VOCAB_DICT)
+
+    return df, vocab_dict

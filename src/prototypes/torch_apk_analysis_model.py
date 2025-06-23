@@ -35,7 +35,7 @@ from sklearn.metrics import (
     classification_report,
 )
 
-from preprocessing_utils import apply_scalers_to_dataframe
+from utils.preprocessing_utils import apply_scalers_to_dataframe
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ class NNHyperparams:
     grad_scaler_max_norm: float = 1.0
 
 
-class DebrimDataset(Dataset):
+class ApkAnalysisDataset(Dataset):
     """
     PyTorch Dataset for APK analysis data with mixed input types.
     """
@@ -261,7 +261,7 @@ def collate_fn(batch):
     )
 
 
-class DebrimEmbedder(nn.Module):
+class APKFeatureEmbedder(nn.Module):
     """Feature embedding module for the APK analysis model."""
 
     def __init__(
@@ -419,7 +419,7 @@ class DebrimEmbedder(nn.Module):
             )
             if self.output_dim == 0:
                 print(
-                    "Warning: DebrimEmbedder output_dim is 0. No embeddings generated, returning zeros."
+                    "Warning: APKFeatureEmbedder output_dim is 0. No embeddings generated, returning zeros."
                 )
         else:
             concatenated_embeddings = torch.cat(pooled_embeddings, dim=1)
@@ -427,9 +427,9 @@ class DebrimEmbedder(nn.Module):
         return concatenated_embeddings, scalars
 
 
-class DebrimClassifier(nn.Module):
+class APKClassifier(nn.Module):
     """
-    MLP classifier head for the Debrim model.
+    MLP classifier head for the APKAnalysis model.
 
     A multi-layer perceptron (MLP) classifier that processes the embedded features
     and produces class probabilities for malware detection.
@@ -492,7 +492,7 @@ class DebrimClassifier(nn.Module):
         return self.mlp(x)
 
 
-class DebrimModel(nn.Module):
+class APKAnalysisModel(nn.Module):
     """
     Complete APK Analysis model combining embedder and classifier components.
 
@@ -501,9 +501,9 @@ class DebrimModel(nn.Module):
 
     Parameters
     ----------
-    embedder : DebrimEmbedder
+    embedder : APKFeatureEmbedder
         The embedder component that processes different feature types
-    classifier : DebrimClassifier, optional
+    classifier : APKClassifier, optional
         The classifier component that processes embedded features
     scalar_dim : int
         Number of scalar features to include in the model
@@ -526,7 +526,7 @@ class DebrimModel(nn.Module):
         # If no classifier is provided, create a default one with standard parameters
         if classifier is None:
             total_input_dim = embedder.output_dim + scalar_dim
-            self.classifier = DebrimClassifier(
+            self.classifier = APKClassifier(
                 input_dim=total_input_dim,
                 hidden_dims=[128, 64],
                 n_classes=2,
@@ -557,7 +557,7 @@ class DebrimModel(nn.Module):
         vector_cols = vector_cols or []
         vector_dims = vector_dims or {}
 
-        embedder = DebrimEmbedder(
+        embedder = APKFeatureEmbedder(
             vocab_dict=vocab_dict,
             sequence_cols=sequence_cols,
             embedding_dim=embedding_dim,
@@ -570,7 +570,7 @@ class DebrimModel(nn.Module):
         # Use the output dimension from the created embedder
         total_input_dim = embedder.output_dim + len(scalar_cols)
 
-        classifier = DebrimClassifier(
+        classifier = APKClassifier(
             input_dim=total_input_dim,
             hidden_dims=hidden_dim,
             n_classes=n_classes,
@@ -676,7 +676,7 @@ def train_nn_model(
         "accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"
     ] = "f1",
     random_seed: int = 42,
-) -> tuple[DebrimModel, dict[str, Any], dict[str, StandardScaler]]:
+) -> tuple[APKAnalysisModel, dict[str, Any], dict[str, StandardScaler]]:
     """
     Train a neural network model on the given dataset.
     Can perform a single train/validation split or use explicitly provided validation data.
@@ -795,7 +795,7 @@ def train_nn_model(
     print(f"Using class weights: {class_weights_arr}")
 
     # Create datasets and data loaders
-    train_dataset = DebrimDataset(
+    train_dataset = ApkAnalysisDataset(
         train_df,
         sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
@@ -803,7 +803,7 @@ def train_nn_model(
         vector_cols=vector_cols,
         label_col=hyperparams.label_col,
     )
-    val_dataset = DebrimDataset(
+    val_dataset = ApkAnalysisDataset(
         val_df,
         sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
@@ -838,7 +838,7 @@ def train_nn_model(
     )
 
     # Initialize model
-    model = DebrimModel.from_config(
+    model = APKAnalysisModel.from_config(
         vocab_dict,
         sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
@@ -1138,6 +1138,28 @@ def train_nn_model(
         for metric_name, metric_val in results["final_metrics_best_model"].items():
             print(f"  - {metric_name.capitalize()}: {metric_val:.4f}")
 
+    for key in [
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+        "roc_auc",
+        "pr_auc",
+        "val_losses",
+    ]:
+        if results.get(key) and len(results.get(key, [])) > 0:
+            # Filter out None values that might have been appended
+            valid_values = [v for v in results[key] if v is not None]
+            if valid_values:
+                results[f"mean_{key}"] = np.mean(valid_values)
+                results[f"std_{key}"] = np.std(valid_values)
+            else:
+                results[f"mean_{key}"] = np.nan
+                results[f"std_{key}"] = np.nan
+        else:
+            results[f"mean_{key}"] = np.nan
+            results[f"std_{key}"] = np.nan
+
     # Explicit cleanup before returning
     del train_df, val_df, train_dataset, val_dataset, train_loader, val_loader
     del optimizer, scheduler, criterion, scaler
@@ -1168,7 +1190,7 @@ def cross_val_train_nn_model(
     ] = "f1",
     device: torch.device | None = None,
     random_seed: int = 42,
-) -> tuple[DebrimModel | None, dict[str, Any], dict[str, StandardScaler] | None]:
+) -> tuple[APKAnalysisModel | None, dict[str, Any], dict[str, StandardScaler] | None]:
     """
     Train a neural network model with cross-validation using the provided hyperparameters.
     This function now calls train_nn_model for each fold.
@@ -1272,7 +1294,6 @@ def cross_val_train_nn_model(
             vector_dims=vector_dims,
             hyperparams=hyperparams,  # Pass the same hyperparams for each fold
             device=device,
-            # train_split_ratio is ignored because val_df_explicit is provided
             scoring_metric=scoring_metric,  # train_nn_model uses this for its internal best model (by val_loss)
             random_seed=random_seed
             + fold_counter,  # Vary seed slightly per fold for optimizer init if desired
@@ -1351,7 +1372,7 @@ def cross_val_train_nn_model(
         "model_size",
         "training_time",
     ]:
-        if aggregated_results.get(key) and len(aggregated_results.get(key)) > 0:
+        if aggregated_results.get(key) and len(aggregated_results.get(key, [])) > 0:
             # Filter out None values that might have been appended
             valid_values = [v for v in aggregated_results[key] if v is not None]
             if valid_values:
@@ -1378,7 +1399,7 @@ def cross_val_train_nn_model(
     # Instantiate and load the overall best model
     if overall_best_model_state:
         print("Loading the overall best model state...")
-        best_model_overall = DebrimModel.from_config(
+        best_model_overall = APKAnalysisModel.from_config(
             vocab_dict,
             sequence_cols=sequence_cols,
             scalar_cols=scalar_cols,
@@ -1403,7 +1424,7 @@ def cross_val_train_nn_model(
 
 
 def predict(
-    model: DebrimModel,
+    model: APKAnalysisModel,
     df: pd.DataFrame,
     scalers: dict[str, StandardScaler],
     scalar_cols: list[str],
@@ -1414,11 +1435,11 @@ def predict(
     label_col: str = "is_malware",
 ) -> tuple[list[int], list[list[float]]]:
     """
-    Generate predictions and probability scores using a trained DebrimModel.
+    Generate predictions and probability scores using a trained APKAnalysisModel.
 
     Parameters
     ----------
-    model : DebrimModel
+    model : APKAnalysisModel
         Trained model to use for inference
     df : pandas.DataFrame
         Data to perform predictions on
@@ -1454,7 +1475,7 @@ def predict(
         df, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
     )
 
-    dataset = DebrimDataset(
+    dataset = ApkAnalysisDataset(
         df_processed,
         sequence_cols=None,
         scalar_cols=scalar_cols,
@@ -1488,7 +1509,7 @@ def predict(
 
 
 def extract_embeddings(
-    model: DebrimModel | DebrimEmbedder,
+    model: APKAnalysisModel | APKFeatureEmbedder,
     df: pd.DataFrame,
     scalers: dict[str, StandardScaler],
     sequence_cols: list[str],
@@ -1504,7 +1525,7 @@ def extract_embeddings(
 
     Parameters
     ----------
-    model : DebrimModel | DebrimEmbedder
+    model : APKAnalysisModel | APKFeatureEmbedder
         Trained model or embedder to extract embeddings from
     df : pandas.DataFrame
         Data to extract embeddings for
@@ -1540,7 +1561,7 @@ def extract_embeddings(
         df, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
     )
 
-    dataset = DebrimDataset(
+    dataset = ApkAnalysisDataset(
         df_processed,
         sequence_cols=sequence_cols,
         char_cols=char_cols,
@@ -1554,7 +1575,7 @@ def extract_embeddings(
 
     all_embeddings = []
     all_labels = []
-    embedder = model.embedder if isinstance(model, DebrimModel) else model
+    embedder = model.embedder if isinstance(model, APKAnalysisModel) else model
 
     with torch.no_grad():
         for seq_feats, char_feats, vector_feats, scalars, labels in loader:
@@ -1584,7 +1605,7 @@ def extract_embeddings(
 
 
 def evaluate_model_on_test_set(
-    model: DebrimModel,
+    model: APKAnalysisModel,
     df_test: pd.DataFrame,
     scalers: dict[str, StandardScaler],
     sequence_cols: list[str],
@@ -1595,11 +1616,11 @@ def evaluate_model_on_test_set(
     device: torch.device | None = None,
 ) -> dict[str, Any]:
     """
-    Evaluates a trained DebrimModel on a completely unseen test set.
+    Evaluates a trained APKAnalysisModel on a completely unseen test set.
 
     Parameters
     ----------
-    model : DebrimModel
+    model : APKAnalysisModel
         The trained model to evaluate
     df_test : pandas.DataFrame
         The test dataset containing features and labels
@@ -1638,7 +1659,7 @@ def evaluate_model_on_test_set(
         df_test, scalar_cols, vector_cols, scalers=scalers, fit_scalers=False
     )
 
-    test_dataset = DebrimDataset(
+    test_dataset = ApkAnalysisDataset(
         df_test_processed,
         sequence_cols=sequence_cols,
         scalar_cols=scalar_cols,
