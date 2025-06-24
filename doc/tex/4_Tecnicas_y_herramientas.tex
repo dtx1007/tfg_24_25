@@ -2,9 +2,34 @@
 
 En este apartado se comentan y analizan las diferentes herramientas usadas en la realización de este proyecto.
 
-\section{PyTorch vs Keras}
+\section{Lenguajes y añadidos}
+% introducción
 
-% TODO: Breve definición y cambiar para que use las funciones de la plantilla
+\subsection{Python}
+% Lenguaje de scripting muy amigable y popular hoy en día. Todo lo relacionado con IA se realiza en el. Es facilmente extensible y proporciona librerías y bases de código muy buenas y pulidas para todo lo relacinado con IA y en general es un lenguaje con un soporte muy grande y pensado pra la automatización de procesos y tareas.
+
+\subsection{Poetry}
+
+Poetry es una herramienta de gestión de dependencias y empaquetado para Python. A diferencia de los métodos tradicionales que combinan herramientas como \textit{pip}, \textit{requirements.txt} y \textit{virtualenv}, Poetry integra todas estas funcionalidades bajo una única interfaz de comandos y un archivo de configuración llamado pyproject.toml. Dicho archivo puede ser modificado para declarar las dependencias del proyecto, características del paquete final, versiones y otro tipo de configuraciones adicionales para la generación de distribuciones y reglas de resolución de paquetes. Poetry se encargará posteriormente de generar a partir de dicho archivo de configuración un fichero llamado \textit{poetry.lock}, el cual contiene todas las versiones exactas de cada paquete y sus dependencias correspondientes, correctamente resueltas y guardadas en un formato que permitirá posteriormente reproducir el entorno de forma simple y directa.
+
+En este caso, Poetry no solo es útil para proyectos grandes sino que es extremadamente cómodo para cualquier proyecto de Python que necesite de un par de dependencias, puesto que permite crear entornos virtuales con solo un par de comandos, permitiendo así no modificar la instalación global de Python en el sistema y permitiendo una gestión más compleja de ciertas dependencias en función de las prestaciones del equipo que uno posee o su sistema operativo. Por ejemplo, en este proyecto, una de las librerías usadas es PyTorch, la cual cuenta con soporte para aceleración por GPU de sus operaciones, pero, este soporte viene incluido en un paquete diferente al del paquete que solo permite el uso de la CPU. Usando Poetry es posible crear una configuración dinámica que sea capaz de adaptarse al equipo de cada uno, descargando o no la versión con o sin aceleración por hardware en función de si el equipo es compatible con ello.
+
+\subsection{Jupyter Notebook}
+
+\section{Librerías}
+% introducción
+
+\subsection{PyTorch vs Keras}
+
+PyTorch y Keras representan dos de los \textit{frameworks} de \textit{deep learning} más conocidos y utilizados en la actualidad. Si bien ambos facilitan la construcción de redes neuronales, cada uno toma una filosofía de diseño distinta, lo cual los hace más adecuados para diferentes tipos de proyectos y usuarios. Keras funciona como una interfaz de alto nivel, diseñada para la simplicidad y el desarrollo rápido, mientras que PyTorch opera a un nivel más bajo, ofreciendo un control granular y una mayor flexibilidad a la hora de desarrollar modelos personalizados y específicos.
+
+Keras se caracteriza principalmente por su facilidad de uso, debido a que permite construir y entrenar modelos estándar con muy pocas líneas de código. Su API es bastante intuitiva y abstrae gran parte de la complejidad subyacente, lo que lo convierte en una opción excelente para principiantes y para la creación rápida de prototipos y para entornos de producción donde la estandarización es clave. Sin embargo, esta simplicidad conlleva una menor flexibilidad, ya que realizar modificaciones sustanciales en la arquitectura o en el ciclo de entrenamiento de los modelos puede volverse complejo y poco intuitivo debido a no estar diseñado para ello.
+
+Por el contrario, PyTorch proporciona un set de herramientas mucho más versátil, pensado para la investigación y para proyectos que requieren de arquitecturas personalizadas. En general, permite crear modelos de forma mucho más granular debido a que se basa en proporcionar al usuario con un conjunto de módulos y funciones que pueden ser instanciadas juntas para formar un modelo complejo y personalizado, especializado en la tarea que se desee. A su vez, permite definir de manera más concreta el set de datos a usar, el preprocesado de esos datos y el cómo se entrena el modelo a partir de ellos.
+
+En concreto, para este proyecto, PyTorch fue la elección más lógica. La arquitectura del modelo de clasificación de APKs no es convencional; se procesan un montón de cadenas de caracteres y vectores, los cuales requieren de un preprocesado específico y de la implementación de un \textit{embedder} personalizado para poder usar posteriormente dichas características junto con una lógica y control sobre el proceso de entrenamiento bastante concreto.
+
+% TODO: Fixear tabla
 
 \begin{table}[!ht]
 	\raggedleft
@@ -20,9 +45,60 @@ En este apartado se comentan y analizan las diferentes herramientas usadas en la
 	\caption{Comparativa entre PyTorch y Keras}
 \end{table}
 
-%\section{Vue (\textit{Framework} web)}
+\subsection{NumPy, Pandas y Matplotlib}
 
-Esta parte de la memoria tiene como objetivo presentar las técnicas metodológicas y las herramientas de desarrollo que se han utilizado para llevar a cabo el proyecto. Si se han estudiado diferentes alternativas de metodologías, herramientas, bibliotecas se puede hacer un resumen de los aspectos más destacados de cada alternativa, incluyendo comparativas entre las distintas opciones y una justificación de las elecciones realizadas. 
-No se pretende que este apartado se convierta en un capítulo de un libro dedicado a cada una de las alternativas, sino comentar los aspectos más destacados de cada opción, con un repaso somero a los fundamentos esenciales y referencias bibliográficas para que el lector pueda ampliar su conocimiento sobre el tema.
+NumPy, Pandas y Matplotlib constituyen la trilogía fundamental de librerías sobre las que se edifica gran parte del ecosistema de paquetes científicos y de data science en Python.
 
+\begin{itemize}
+	\item \textbf{NumPy (\textit{Numerical Python}):} Es la librería base para la computación numérica en Python. Proporciona el concepto de ndarray, una estructura de datos para la creación de arrays N-dimensionales eficientes, y un vasto conjunto de funciones matemáticas para operar sobre ellos. Una de las mayores ventajas de NumPy es su velocidad y eficiencia tanto en tiempo, como en espacio al trabajar con grandes sets de datos. Este rendimiento se debe principalmente a que muchas de sus operaciones están implementadas en C y aprovechan la vectorización, permitiendo ejecutar operaciones complejas en arrays completos sin necesidad de bucles explícitos en Python.
+	
+	\item \textbf{Pandas:} Construida sobre NumPy, Pandas introduce estructuras de datos de alto nivel, principalmente el DataFrame, una tabla bidimensional heterogénea e indexada, pensada para manejar datos tabulares y series temporales. Facilita enormemente tareas como la lectura y escritura de datos, la limpieza, el filtrado, la agregación y la transformación, siendo una herramienta muy útil estándar para el preprocesamiento de datos.
 
+	\item \textbf{Matplotlib:} Es la librería de visualización de datos por excelencia en Python. Permite elegir entre un gran repertorio de gráficos comunes como pueden ser los gráficos de barras o histogramas a, la creación de gráficos personalizados, facilitando el trabajo de representar datos complejos y hacerlos agradables a la vista.
+	
+\end{itemize}
+
+Estas tres librerías han sido de gran ayuda en diferentes etapas del proyecto. Pandas ha sido la herramienta principal para estructurar las características extraídas de los archivos APK en un DataFrame limpio y manejable, facilitando todo el preprocesamiento. NumPy ha sido utilizado de forma subyacente por Pandas y PyTorch, y directamente para realizar operaciones numéricas eficientes sobre los datos ya procesados antes de introducirlos en el modelo. Finalmente, Matplotlib ha sido usada para la evaluación del modelo, permitiendo visualizar diferentes aspectos del entrenamiento del modelo y la comparación de este con otros de una manera más visual.
+
+\subsection{scikit-learn}
+% Librería para entrenamiento de modelos clásicos de ml, proporciona una gran base de ejemplos y todo tipo de herramietnas y utilidades para trabajar con datos, entrenar y evaluar modelos de diferentes tipos, la mayor ventaja que posee es que todo los modelos y la gran mayoría de sus técnicas caen dentro de una interfaz común la cual es muy simple de entender y usar.
+
+\subsection{Optuna}
+% Tuning del modelo, búsqueda inteligente de los mejores hiperparámetros para este.
+
+\subsection{Streamlit}
+
+Streamlit es un \textit{framework} de código abierto para Python, diseñado específicamente para la creación y el despliegue rápido de aplicaciones web interactivas para proyectos de \textit{data science} y aprendizaje automático. Su filosofía se basa en la simplicidad radical, permitiendo transformar \textit{scripts} convencionales con código de procesamiento de datos, modelos de IA o simples funciones aisladas en aplicaciones web funcionales con un esfuerzo y conocimiento de desarrollo web mínimos.
+
+A diferencia de \textit{frameworks} web más tradicionales y complejos como Django o Flask, que exigen la gestión de rutas, una organización de los ficheros del proyecto específica, sintaxis inusual, plantillas HTML y lógica de servidor, Streamlit permite construir una interfaz de usuario directamente desde un script normal de Python. Con comandos sencillos, se pueden añadir elementos interactivos como botones, deslizadores, gráficos y, fundamentalmente para este caso, campos para la subida de archivos. Esto acelera drásticamente el ciclo de desarrollo puesto que uno puede simplemente centrarse en obtener un modelo o set de funcionalidades que son correctas y dan buenos resultados sin preocuparse mucho de cómo se llevará luego esto a una interfaz gráfica o aplicación de escritorio / web puesto que la conversión es muy sencilla en la mayoría de casos.
+
+La finalidad de la aplicación web en este proyecto es ofrecer una demostración tangible y una especie de \textit{demo} o entorno de prueba para que cualquiera pudiera probar el clasificador de \textit{malware} de forma sencilla. El objetivo era crear una interfaz simple donde un usuario pudiera subir un archivo .apk y recibir una predicción de manera inmediata. Streamlit fue la herramienta perfecta para esta tarea, ya que permitió desarrollar esta funcionalidad en cuestión de horas en lugar de días y el resultado es más que suficiente para el alcance deseado.
+
+\subsection{Androguard y otros analizadores}
+
+Androguard es una potente herramienta de código abierto y un paquete de Python, diseñada específicamente para el análisis estático y la ingeniería inversa de aplicaciones de Android (archivos APK). Su función principal es el proceso de diseccionar un archivo APK para extraer información detallada sobre su estructura y contenido sin necesidad de ejecutar la aplicación. Una de las mayores ventajas de Androguard es el hecho de que permite además realizar todo este proceso de extracción de características de forma automatizada puesto que, expone una API de Python bastante simple e intuitiva que proporciona acceso a todos los datos que se pueden obtener de analizar las APKs.
+
+A través de Androguard, es posible acceder a componentes como el \textit{manifest} de la aplicación (AndroidManifest.xml) para analizar permisos y componentes declarados, desensamblar el código Dalvik (DEX) para inspeccionar las clases y los métodos, e incluso, extraer recursos como cadenas de texto o certificados. Aunque existen otras herramientas de análisis como MobSF (que ofrece un entorno más automatizado y visual) o Jadx (un popular descompilador), Androguard destaca por su granularidad, simplicidad de uso y su naturaleza como librería de Python.
+
+Una de las piedras fundamentales de este proyecto es la posibilidad de extraer características de forma estática de APKs y entrenar un modelo con ellas capaz de discernir entre aplicaciones benignas y malignas. La razón principal de su eso es el hecho de funcionar nativamente en Python y permitir la automatización de la creación del \textit{dataset} de entrenamiento del modelo. A su vez, es el componente que permite analizar muestras nuevas, obteniendo los datos que el modelo espera recibir para realizar una predicción.
+
+\section{Otras herramientas}
+% breve introdución
+
+\subsection{Docker}
+
+Docker es una plataforma de código abierto que permite automatizar el despliegue, la ejecución, la distribución y la gestión de aplicaciones mediante el uso de la ''containerización''. Esta herramienta permite empaquetar una aplicación y todas sus dependencias como bibliotecas, herramientas del sistema, código, comandos de ejecución, configuraciones y todo lo que uno pueda necesitar para ejecutar su aplicación en una unidad independiente y aislada llamada contenedor.
+
+El principal problema que Docker intenta resolver es el clásico ''en mi equipo funciona'', donde una aplicación se ejecuta correctamente en el entorno de un desarrollador pero falla en otro debido a diferencias en la configuración del sistema operativo o en las versiones de las dependencias, además de posibles errores en la ejecución del proyecto y diversas posibles causas. Un contenedor soluciona esto debido a que, uno puede simplemente distribuir un único archivo que describe el proceso de creación del contenedor llamado \textit{Dockerfile} (o la misma imagen del contenedor ya creado) garantizando que cualquiera podrá ejecutar el proyecto exactamente de la misma manera en cualquier máquina que soporte Docker, desde un portátil local hasta un servidor en la nube. Esto asegura la consistencia, la reproducibilidad y simplifica enormemente los flujos de trabajo desarrollo.
+
+% TODO: añadir justificación
+
+\subsection{GitHub}
+% Usado para hostear el repositorio de código del proyecto
+
+\subsection{VSCode}
+% Comentar lo que es un IDE y porqué es muy útil a la hora de desarrolar y simplificar el trabajo del desarrollador.
+% IDE usado para editar el código
+
+\subsection{TeXstudio}
+% IDE usado para editar la memoria y anexos (documentación del proyecto). Dicha documentación está en LaTeX y se usa este programa para poder editarla de forma mucho más cómoda y sencilla.
