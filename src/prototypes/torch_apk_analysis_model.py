@@ -12,8 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from torchtext.vocab.vocab import Vocab
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import autocast
 
 from dataclasses import dataclass, field
 from typing import Literal, Self, Any
@@ -268,6 +267,7 @@ class APKFeatureEmbedder(nn.Module):
         self,
         vocab_dict,
         sequence_cols=None,
+        scalar_cols=None,
         embedding_dim=128,
         seq_pooling="mean",
         char_cols=None,
@@ -278,7 +278,8 @@ class APKFeatureEmbedder(nn.Module):
         self.seq_padding_indices = {}
         self.embedding_dim = embedding_dim
         self.seq_pooling = seq_pooling
-        self.sequence_cols = sequence_cols or []  # Store sequence column names
+        self.sequence_cols = sequence_cols or []
+        self.scalar_cols = scalar_cols or []
         self.char_cols = char_cols or []
         self.vector_cols = vector_cols or []
         self.vector_dims = vector_dims or {}
@@ -288,7 +289,7 @@ class APKFeatureEmbedder(nn.Module):
         for col in self.sequence_cols:
             if col in vocab_dict:
                 current_vocab = vocab_dict[col]
-                padding_idx = current_vocab.get_stoi().get("<PAD>", 0)
+                padding_idx = current_vocab.get("<PAD>", 0)
                 self.seq_embedders[col] = nn.Embedding(
                     num_embeddings=len(current_vocab),
                     embedding_dim=embedding_dim,
@@ -304,7 +305,7 @@ class APKFeatureEmbedder(nn.Module):
             for col in self.char_cols:
                 if col in vocab_dict:
                     current_vocab = vocab_dict[col]
-                    padding_idx = current_vocab.get_stoi().get("<PAD>", 0)
+                    padding_idx = current_vocab.get("<PAD>", 0)
                     self.char_embedders[col] = nn.Embedding(
                         num_embeddings=len(current_vocab),
                         embedding_dim=embedding_dim // 2,
@@ -538,7 +539,7 @@ class APKAnalysisModel(nn.Module):
     @classmethod
     def from_config(
         cls,
-        vocab_dict: dict[str, Vocab],
+        vocab_dict: dict[str, dict[str, int]],
         sequence_cols: list[str],
         scalar_cols: list[str],
         char_cols: list[str],
@@ -560,6 +561,7 @@ class APKAnalysisModel(nn.Module):
         embedder = APKFeatureEmbedder(
             vocab_dict=vocab_dict,
             sequence_cols=sequence_cols,
+            scalar_cols=scalar_cols,
             embedding_dim=embedding_dim,
             seq_pooling=seq_pooling,
             char_cols=char_cols,
@@ -662,7 +664,7 @@ def get_best_available_device() -> torch.device:
 
 def train_nn_model(
     df: pd.DataFrame,
-    vocab_dict: dict[str, Vocab],
+    vocab_dict: dict[str, dict[str, int]],
     sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
@@ -888,7 +890,7 @@ def train_nn_model(
     )
 
     criterion = nn.CrossEntropyLoss(weight=weights_tensor)
-    scaler = GradScaler(enabled=(device.type == "cuda"))  # Enable only for CUDA
+    scaler = torch.GradScaler(enabled=(device.type == "cuda"))
 
     # Training loop
     train_losses_epoch, val_losses_epoch = [], []
@@ -945,7 +947,9 @@ def train_nn_model(
 
             optimizer.zero_grad(set_to_none=True)
 
-            with autocast(enabled=(device.type == "cuda")):
+            with torch.autocast(
+                device_type=device.type, enabled=(device.type == "cuda")
+            ):
                 logits = model(seq_feats, char_feats, vector_feats, scalars)
                 loss = criterion(logits, labels)
 
@@ -991,7 +995,9 @@ def train_nn_model(
                 scalars = {k: v.to(device) for k, v in scalars.items()}
                 labels = labels.to(device)
 
-                with autocast(enabled=(device.type == "cuda")):
+                with torch.autocast(
+                    device_type=device.type, enabled=(device.type == "cuda")
+                ):
                     logits = model(seq_feats, char_feats, vector_feats, scalars)
                     loss = criterion(logits, labels)
 
@@ -999,9 +1005,9 @@ def train_nn_model(
                 preds = torch.argmax(logits, dim=1)
                 probs = F.softmax(logits, dim=1)[:, 1]  # Prob of positive class
 
-                y_true_val.extend(labels.cpu().tolist())
-                y_pred_val.extend(preds.cpu().tolist())
-                y_prob_val.extend(probs.cpu().tolist())
+                y_true_val.extend(labels.cpu().numpy())
+                y_pred_val.extend(preds.cpu().numpy())
+                y_prob_val.extend(probs.cpu().numpy())
 
         avg_epoch_val_loss = epoch_val_loss / len(val_loader)
         results["val_losses"].append(avg_epoch_val_loss)
@@ -1176,7 +1182,7 @@ def train_nn_model(
 
 def cross_val_train_nn_model(
     df: pd.DataFrame,
-    vocab_dict: dict[str, Vocab],
+    vocab_dict: dict[str, dict[str, int]],
     sequence_cols: list[str],
     scalar_cols: list[str],
     char_cols: list[str],
@@ -1503,8 +1509,8 @@ def predict(
             probs = torch.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)
 
-            all_preds.extend(preds.cpu().tolist())
-            all_probs.extend(probs.cpu().tolist())
+            all_preds.extend(preds.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
 
     return all_preds, all_probs
 
@@ -1599,8 +1605,8 @@ def extract_embeddings(
             else:
                 final_embeddings = embeddings
 
-            all_embeddings.append(final_embeddings.cpu().tolist())
-            all_labels.append(labels.cpu().tolist())
+            all_embeddings.append(final_embeddings.cpu().numpy())
+            all_labels.append(labels.cpu().numpy())
 
     return np.vstack(all_embeddings), np.concatenate(all_labels)
 
@@ -1699,9 +1705,9 @@ def evaluate_model_on_test_set(
             preds = torch.argmax(logits, dim=1)
             probs = torch.softmax(logits, dim=1)[:, 1]
 
-            all_labels_test.extend(labels.cpu().tolist())
-            all_preds_test.extend(preds.cpu().tolist())
-            all_probs_test.extend(probs.cpu().tolist())
+            all_labels_test.extend(labels.cpu().numpy())
+            all_preds_test.extend(preds.cpu().numpy())
+            all_probs_test.extend(probs.cpu().numpy())
     inference_time = time.time() - inference_start_time
 
     # Calculate metrics

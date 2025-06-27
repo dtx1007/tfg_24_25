@@ -6,7 +6,6 @@ import torch
 
 from pathlib import Path
 
-from torchtext.vocab import Vocab
 from sklearn.preprocessing import StandardScaler
 
 from .vocab_utils import create_vocab_for_column, create_char_vocab
@@ -37,12 +36,12 @@ def preprocess_data_for_nn(
     vector_cols: list[str],
     scalar_cols: list[str],
     vector_dims: dict[str, int],
-    vocab_dict: dict[str, Vocab] | None = None,
+    vocab_dict: dict[str, dict[str, int]] | None = None,
     max_lengths: dict[str, int] | None = None,
     pad_token: str = "<PAD>",
     unk_token: str = "<UNK>",
     empty_token: str = "<EMPTY>",
-) -> tuple[pd.DataFrame, dict[str, Vocab]]:
+) -> tuple[pd.DataFrame, dict[str, dict[str, int]]]:
     """
     Comprehensive preprocessing for APK dataset for the APKAnalysisModel.
     Handles:
@@ -146,10 +145,9 @@ def preprocess_data_for_nn(
 
     # 4. Convert CHAR_COLS strings to lists of indices
     def convert_string_to_indices(text_str, vocab, unk_t, empty_t):
-        stoi = vocab.get_stoi()
         if isinstance(text_str, str):
-            return [stoi.get(char, stoi[unk_t]) for char in text_str]
-        return [stoi[empty_t]]
+            return [vocab.get(char, vocab[unk_t]) for char in text_str]
+        return [vocab[empty_t]]
 
     for col in char_cols:
         if col in df.columns and col in vocab_dict:
@@ -166,9 +164,9 @@ def preprocess_data_for_nn(
     # 5. Tokenize SEQUENCE_COLS (lists of strings) to lists of indices & PAD
     for col in sequence_cols:
         if col in df.columns and col in vocab_dict:
-            stoi = vocab_dict[col].get_stoi()
-            pad_idx = stoi.get(pad_token)  # Vocab should guarantee pad_token
-            unk_idx = stoi.get(unk_token)
+            col_vocab = vocab_dict[col]
+            pad_idx = col_vocab.get(pad_token)
+            unk_idx = col_vocab.get(unk_token)
             max_len = max_lengths.get(col)
 
             if max_len is None:
@@ -180,7 +178,7 @@ def preprocess_data_for_nn(
 
             tokenized_and_padded_sequences = []
             for token_list in df[col]:
-                indices = [stoi.get(token, unk_idx) for token in token_list]
+                indices = [col_vocab.get(token, unk_idx) for token in token_list]
                 padding_needed = max_len - len(indices)
                 if padding_needed > 0:
                     padded_indices = indices + [pad_idx] * padding_needed
@@ -196,8 +194,8 @@ def preprocess_data_for_nn(
     # 6. Pad CHAR_COLS (already lists of indices)
     for col in char_cols:
         if col in df.columns and col in vocab_dict:
-            stoi = vocab_dict[col].get_stoi()
-            pad_idx = stoi.get(pad_token)
+            col_vocab = vocab_dict[col]
+            pad_idx = col_vocab.get(pad_token)
             max_len = max_lengths.get(col)
 
             if max_len is None:

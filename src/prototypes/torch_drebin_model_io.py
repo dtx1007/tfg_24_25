@@ -13,8 +13,6 @@ from .torch_debrin_model import (
     get_best_available_device,
 )
 
-from torchtext.vocab import Vocab
-
 from typing import Any
 from pathlib import Path
 
@@ -50,7 +48,7 @@ def _convert_numpy_to_list(data: Any) -> Any:
 
 def save_model_with_metadata(
     model: DebrimModel,
-    vocab_dict: dict[str, Vocab],
+    vocab_dict: dict[str, dict[str, int]],
     hyperparams: NNHyperparams,
     results: dict[str, Any] | None = None,
     save_dir: Path | str = "./model_artifacts/nn_models",
@@ -334,7 +332,7 @@ def load_debrim_model_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimModel, dict[str, Vocab], dict[str, Any]]:
+) -> tuple[DebrimModel, dict[str, dict[str, int]], dict[str, Any]]:
     """
     Load a complete DebrimModel from a specific version directory.
 
@@ -414,7 +412,7 @@ def load_debrim_embedder_from_version(
     version: str | None = None,
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
-) -> tuple[DebrimEmbedder, dict[str, Vocab], dict[str, Any]]:
+) -> tuple[DebrimEmbedder, dict[str, dict[str, int]], dict[str, Any]]:
     """
     Load only the embedder component from a specific version directory.
 

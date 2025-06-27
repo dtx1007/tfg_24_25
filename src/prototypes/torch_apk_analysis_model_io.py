@@ -15,8 +15,6 @@ from .torch_apk_analysis_model import (
     get_best_available_device,
 )
 
-from torchtext.vocab import Vocab
-
 from typing import Any
 from pathlib import Path
 
@@ -41,7 +39,7 @@ def _convert_numpy_to_list(data: Any) -> Any:
 
 def save_model_with_metadata(
     model: APKAnalysisModel,
-    vocab_dict: dict[str, Vocab],
+    vocab_dict: dict[str, dict[str, int]],
     hyperparams: NNHyperparams,
     scalers: dict[str, StandardScaler],
     results: dict[str, Any] | None = None,
@@ -230,7 +228,10 @@ def load_apk_analysis_model_from_version(
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
 ) -> tuple[
-    APKAnalysisModel, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]
+    APKAnalysisModel,
+    dict[str, dict[str, int]],
+    dict[str, StandardScaler],
+    dict[str, Any],
 ]:
     """
     Load a complete APKAnalysisModel, its vocabulary, scalers, and metadata from a specific version directory.
@@ -328,7 +329,10 @@ def load_apk_feature_embedder_from_version(
     base_dir: Path | str = "./model_artifacts/nn_models",
     device: torch.device | None = None,
 ) -> tuple[
-    APKFeatureEmbedder, dict[str, Vocab], dict[str, StandardScaler], dict[str, Any]
+    APKFeatureEmbedder,
+    dict[str, dict[str, int]],
+    dict[str, StandardScaler],
+    dict[str, Any],
 ]:
     """
     Load only the embedder component, vocab, scalers (if present), and metadata from a specific version directory.

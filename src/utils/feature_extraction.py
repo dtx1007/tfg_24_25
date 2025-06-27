@@ -3,6 +3,7 @@ import gc
 import ppdeep
 import androguard.misc
 import androguard.util
+import androguard.session
 import pandas as pd
 
 
@@ -42,10 +43,19 @@ def extract_opcodes(dx):
 
 def analyze_apk(apk_path):
     """Analyzes a single APK file and returns its features as a dictionary."""
+    # Create a new session for each analysis to ensure isolation
+    s = androguard.misc.get_default_session()
+
     try:
         # Set logger to critical to avoid excessive output from androguard
-        androguard.util.set_log("CRITICAL")
-        a, d, dx = androguard.misc.AnalyzeAPK(apk_path)
+        # If this function is called multiple times, the log level is already set,
+        # but if we do it again it will not raise an error.
+        try:
+            androguard.util.set_log("CRITICAL")
+        except Exception:
+            ...
+
+        a, d, dx = androguard.misc.AnalyzeAPK(apk_path, session=s)
 
         apk_size = os.path.getsize(apk_path)
         apk_fuzzy_hash = ppdeep.hash_from_file(apk_path)
@@ -65,14 +75,18 @@ def analyze_apk(apk_path):
             "opcode_counts": extract_opcodes(dx),
         }
 
-        # Clean up Androguard objects
+        # Clean up Androguard objects before finishing the session
         del a, d, dx
-        gc.collect()
 
         return features, os.path.basename(apk_path)
     except Exception as e:
         error_msg = f"Error analyzing {os.path.basename(apk_path)}: {str(e)}"
         return None, error_msg
+    finally:
+        s.reset()
+        del s
+
+        gc.collect()
 
 
 def features_dict_to_dataframe(features_dict):

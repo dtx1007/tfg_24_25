@@ -1,6 +1,7 @@
 **.csv
 .env
 .DS_Store
+androguard.db*
 
 ### Python .gitignore template (https://github.com/github/gitignore/blob/main/Python.gitignore)
 # Byte-compiled / optimized / DLL files
