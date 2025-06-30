@@ -1,12 +1,6 @@
 \capitulo{5}{Aspectos relevantes del desarrollo del proyecto}
 
-\section{Resumen del trabajo}
-
-Este trabajo aborda la creación de una herramienta automatizada para la clasificación de \textit{malware} en Android mediante análisis estático. La estrategia consiste en examinar las aplicaciones de forma segura, sin ejecutarlas, para que un modelo de inteligencia artificial evalúe sus características y determine si son o no maliciosas. El proyecto se desarrolló en dos fases diferentes: una inicial de prototipado y una segunda de desarrollo y refinamiento de la solución final.
-
-La primera fase exploró el estado del arte y validó, mediante un prototipo de red neuronal, que es posible distinguir aplicaciones benignas de malignas usando únicamente sus características estáticas. Sin embargo, este primer modelo se entrenó con un \textit{dataset} preexistente cuyo proceso de creación era una ''caja negra'', lo que puso de manifiesto un grave problema, la incapacidad de aplicar el modelo a nuevas muestras por no saber cómo preparar los datos de entrada.
-
-Para resolver este problema, la segunda fase se centró en la creación de un \textit{dataset} propio, desarrollando un extractor de características replicable con Androguard. Sobre esta nueva base, se construyó y optimizó un nuevo modelo que, al ser evaluado, reveló un hallazgo interesante. Si bien el rendimiento de la red neuronal es excelente, su mayor valor reside en su \textit{embedder}, el componente que transforma los datos en una representación que la red puede entender. Este demostró ser tan eficaz que permitió entrenar otros clasificadores más simples y ligeros con resultados igualmente buenos o incluso mejores que los del modelo principal, convirtiendo a la red en una herramienta muy útil para habilitar la creación de otros modelos que cumplan con este propósito de detectar \textit{malware}.
+% Intro, en este apartado se expone...
 
 \section{Pruebas iniciales y estado del arte}
 % Pruebas iniciales con el dataset de drebin
@@ -34,6 +28,7 @@ Para resolver este problema, la segunda fase se centró en la creación de un \t
 % - Filtrado y descarga de las apks
 % - Pruebas de extración de características con androguard
 % - Creación de un proceso automatizado y creación del dataset
+% - Características extraidas y explicación de estas
 
 \subsection{Pruebas con Androguard}
 
@@ -63,14 +58,19 @@ Para resolver este problema, la segunda fase se centró en la creación de un \t
 % Búsqueda de hiperparámetros optimos mediante optuna
 % - Explicar proceso y resultados
 
-\subsection{Análisis de los resultados}
-% Comparativas de rendimiento
-
 \subsection{Cuantización del modelo}
 % (maybe) Quantización del modelo
 % - Explicar proceso y si merece la pena comparado con el original
 
+\subsection{Análisis de los resultados}
+% Comparativas de rendimiento
 
+\section{Interpretabilidad del modelo}
+\subsection{Análisis de las predicciones mediante SHAP}
+% Explicar las difernets pruebas realizadas, problemas con el hecho de que las funciones de SHAP requerían del uso de wrappers para evaluar el modelo y que se prefirió el uso de un método que fuera agnóstico al modelo. Exponer problema de las características de entrada y el cómo interpretarlas sería complicado, exponer el problema de la separación y agregación de estas. Llegar a la idea de que, para general, se analiza la predición tras el embedder, lo cual presenta el reto de reinterpretar las características y la péridad del "valor" o "sentido" directo de estas pero sigue dando mucho valor al proyecto. Mostrar gráficas para cada modelo y explicar alguna predicción rara.
+\subsection{Análisis del \textit{embedder} y el espacio de características}
+% Hablar acerca de UMAP y la evaluación del embedder y el cómo coloca este los datos en dicho espacio de embeddings. Mostrar gráfica.
+% Concluir que el embedder hace la gran mayoría del trabajo, aprende muy bien a colocar el malware en una region del espacio de características y a las aplicaciones benignas en otra, comentar el hecho de que, esto simplifica un montón el trabajo de otros modelos para parender, puesto que les deja ya gran parte del trabajo hecho. Además reslata una idea interesante y es que parece ser que las características de entrada están muy fuertemente relacionadas o, puede ser una consecuencia de que el embedder hace su trabajo muy bien pero, por norma general tendría sentido, si algo es malware siempre tiende a tener características malas en muchos aspectos. Esto se ve muy bien en el análisis de muestras individuales donde no hay una especie de "tira y afloja" en las predicciones, si algo es maligno, todo suele apoyar esto y, si no lo es, todo suele apuntar a ello nuevamenete, es raro que haya casos en los que las barras se muevan a ambos lados.
 
 \section{Desarrollo de la aplicación web}
 % Desarrollo de la aplicación web

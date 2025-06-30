@@ -9,6 +9,8 @@ Los objetivos funcionales definen las capacidades y acciones que el sistema fina
 	\item \textbf{Clasificación de aplicaciones Android:} El sistema debe ser capaz de recibir un archivo APK y analizarlo para determinar si es malicioso o benigno, devolviendo un resultado claro.
 	
 	\item \textbf{Desarrollo de una interfaz web de demostración:} Crear una aplicación web simple e intuitiva que permita a un usuario subir un archivo APK y obtener la predicción del modelo de forma visual.
+	
+	\item \textbf{Interpretabilidad del modelo:} Ser capaz de explicar el porqué de las decisiones del modelo y reconocer cuales son los factores que más afectan a este y entender cómo realiza las predicciones que estima.
 \end{itemize}
 
 \section{Objetivos técnicos}
@@ -17,13 +19,15 @@ Los objetivos técnicos se refieren a las metas de implementación, arquitectura
 \begin{itemize}
 	\item \textbf{Investigación del estado del arte:} Realizar un análisis de la literatura científica existente para comprender las técnicas actuales de detección de \textit{malware} con IA y posicionar el proyecto.
 	
-	\item \textbf{Creación de un dataset propio:} Diseñar y construir un conjunto de datos a medida, extrayendo características útiles de una cantidad decente de ficheros APK.
+	\item \textbf{Creación de un dataset propio:} Diseñar y construir un conjunto de datos a medida, extrayendo características útiles de una cantidad suficiente de ficheros APK.
 	
-	\item \textbf{Implementación de un \textit{pipeline} de datos:} Desarrollar un proceso completo y replicable que transforme los datos brutos de un APK en el formato numérico que el modelo necesita para su análisis.
+	\item \textbf{Implementación de un \textit{pipeline} de extracción de características:} Desarrollar un proceso completo y replicable que transforme los datos brutos de una APK en el formato numérico que el modelo necesita para su análisis.
 	
 	\item \textbf{Diseño y entrenamiento del modelo de red neuronal:} Construir un modelo de \textit{deep learning} con PyTorch, entrenarlo con el \textit{dataset} propio y optimizar su rendimiento para que sea capaz de clasificar \textit{malware} correctamente.
 	
-	\item \textbf{Ajuste de hiperparámetros:} Utilizar herramientas de búsqueda automatizada como Optuna para encontrar la configuración de hiperparámetros que ofrezca el mejor equilibrio entre rendimiento y tiempo de entrenamiento.
+	\item \textbf{Ajuste de hiperparámetros:} Utilizar herramientas de búsqueda automatizada, como Optuna, para encontrar la configuración de hiperparámetros que ofrezca el mejor equilibrio entre rendimiento y tiempo de entrenamiento.
+	
+	\item \textbf{Cuantización del modelo:} Intentar reducir el tamaño del modelo todo lo posible para optimizar su rendimiento y facilitar su despliegue en otras plataformas.
 	
 	\item \textbf{Análisis comparativo de modelos:} Entrenar clasificadores clásicos de aprendizaje automático (como KNN, SVM, Linear Regression, Random Forest o XGBoost) usando las características procesadas por la red neuronal y comparar sus resultados.
 \end{itemize}
@@ -38,5 +42,5 @@ Estos objetivos describen las competencias y conocimientos que se esperan adquir
 	
 	\item \textbf{Profundizar en IA y ciberseguridad:} Ganar un mejor entendimiento acerca de estos dos grandes campos que hoy en día dominan el mundo de la informática. Comprender a su vez mejor cómo funciona el \textit{malware} y las técnicas que pueden usarse para detectarlo y combatirlo.
 	
-	\item \textbf{Obtener un modelo útil y con un buen rendimiento:} Ser capaz de desarrollar un modelo que pueda competir con otros o, que al menos pueda defenderse. El objetivo principal en este caso es obtener algo que sea capaz de no fallar mucho y que dé predicciones bastante fiables.
+	\item \textbf{Obtener un modelo útil y con un buen rendimiento:} Ser capaz de entrenar un modelo que pueda competir con otros. El objetivo principal en este caso es obtener un modelo que sea capaz de acertar en la mayoría de los casos y que dé predicciones bastante fiables.
 \end{itemize}

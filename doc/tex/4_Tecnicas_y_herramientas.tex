@@ -1,25 +1,63 @@
 \capitulo{4}{Técnicas y herramientas}
 
-En este apartado se comentan y analizan las diferentes herramientas usadas en la realización de este proyecto.
+% TODO: Los links a las distintas aplicaciones deberían ir en el pie de página o en la bibliografía; lo mismo con la plantilla de latex
+
+En este apartado se comentan y analizan las diferentes herramientas y técnicas usadas en la realización de este proyecto.
 
 \section{Lenguajes y añadidos}
-% introducción
+
+En esta sección se describe el lenguaje de programación principal y los conceptos y herramientas de entorno que han sido fundamentales para la organización y el desarrollo del proyecto.
 
 \subsection{Python}
-% Lenguaje de scripting muy amigable y popular hoy en día. Todo lo relacionado con IA se realiza en el. Es facilmente extensible y proporciona librerías y bases de código muy buenas y pulidas para todo lo relacinado con IA y en general es un lenguaje con un soporte muy grande y pensado pra la automatización de procesos y tareas.
+
+% https://www.python.org/
+
+Python es un lenguaje de programación alto nivel, interpretado y multipropósito, conocido por su sintaxis clara y sencilla muy similar al inglés. Su filosofía de diseño se centra en torno a la facilidad de uso, lo que lo ha convertido en uno de los lenguajes más populares del mundo para todo tipo de personas que desean tanto adentrarse en el mundo de la programación, como aquellas que ya tienen cierta experiencia en el campo, especialmente si se trata de tareas de automatización, de ciencia de datos o incluso de IA. Especialmente en este último grupo, prácticamente todo el ecosistema de IA moderno se desarrolla sobre Python. Todo esto se debe, principalmente a su enorme comunidad, su facilidad para crear prototipos rápidos y, sobre todo, su vasto repertorio de librerías especializadas y optimizadas para el cálculo científico y el aprendizaje automático.
+
+\subsection{Entorno virtual}
+
+% https://peps.python.org/pep-0405/
+
+Un entorno virtual es un concepto de programación, especialmente popular en Python, que consiste en crear un directorio aislado que contiene una instalación propia de Python y todas las dependencias específicas de un proyecto dado. Funciona como una <<burbuja>> que separa los paquetes de un proyecto de los de otros proyectos y de la instalación global del sistema. Esto resuelve el clásico problema de tener diferentes proyectos que requieren versiones distintas de las mismas librerías.
+
+La principal ventaja de usar entornos virtuales es que son fáciles de reproducir y de limpiar. Permiten saber con exactitud qué dependencias necesita un proyecto y evitan <<contaminar>> el sistema con paquetes que solo se usan para una tarea concreta. Cuando un proyecto finaliza, basta con borrar la carpeta del entorno para eliminar todo rastro de este, sin dejar dependencias huérfanas. Sin embargo, su gestión tradicional con herramientas como \texttt{venv} y \texttt{pip} puede ser manual y algo tediosa, ya que uno debe encargarse de activarlos, desactivarlos y registrar las dependencias explícitamente.
 
 \subsection{Poetry}
 
-Poetry es una herramienta de gestión de dependencias y empaquetado para Python. A diferencia de los métodos tradicionales que combinan herramientas como \textit{pip}, \textit{requirements.txt} y \textit{virtualenv}, Poetry integra todas estas funcionalidades bajo una única interfaz de comandos y un archivo de configuración llamado pyproject.toml. Dicho archivo puede ser modificado para declarar las dependencias del proyecto, características del paquete final, versiones y otro tipo de configuraciones adicionales para la generación de distribuciones y reglas de resolución de paquetes. Poetry se encargará posteriormente de generar a partir de dicho archivo de configuración un fichero llamado \textit{poetry.lock}, el cual contiene todas las versiones exactas de cada paquete y sus dependencias correspondientes, correctamente resueltas y guardadas en un formato que permitirá posteriormente reproducir el entorno de forma simple y directa.
+% https://python-poetry.org/
+
+Poetry es una herramienta de gestión de dependencias y empaquetado para Python. A diferencia de los métodos tradicionales que combinan herramientas como \texttt{pip}, \texttt{requirements.txt} y \texttt{venv}, Poetry integra todas estas funcionalidades bajo una única interfaz de comandos y un archivo de configuración llamado \texttt{pyproject.toml}. Dicho archivo puede ser modificado para declarar las dependencias del proyecto, características del paquete final, versiones y otro tipo de configuraciones adicionales para la generación de distribuciones y reglas de resolución de paquetes. Poetry se encargará posteriormente de generar a partir de dicho archivo de configuración un fichero llamado \texttt{poetry.lock}, el cual contiene todas las versiones exactas de cada paquete y sus dependencias correspondientes, correctamente resueltas y guardadas en un formato que permitirá posteriormente reproducir el entorno de forma simple y directa.
 
 En este caso, Poetry no solo es útil para proyectos grandes sino que es extremadamente cómodo para cualquier proyecto de Python que necesite de un par de dependencias, puesto que permite crear entornos virtuales con solo un par de comandos, permitiendo así no modificar la instalación global de Python en el sistema y permitiendo una gestión más compleja de ciertas dependencias en función de las prestaciones del equipo que uno posee o su sistema operativo. Por ejemplo, en este proyecto, una de las librerías usadas es PyTorch, la cual cuenta con soporte para aceleración por GPU de sus operaciones, pero, este soporte viene incluido en un paquete diferente al del paquete que solo permite el uso de la CPU. Usando Poetry es posible crear una configuración dinámica que sea capaz de adaptarse al equipo de cada uno, descargando o no la versión con o sin aceleración por hardware en función de si el equipo es compatible con ello.
 
+\subsection{Conda}
+
+% https://anaconda.org/anaconda/conda
+
+Conda es un sistema de gestión de paquetes y entornos de código abierto y multiplataforma. Aunque puede gestionar cualquier lenguaje, es extremadamente popular en la comunidad de Python, especialmente para todo lo relacionado con ciencia de datos e IA. Su distribución principal, Anaconda, viene con un enorme conjunto de librerías científicas preinstaladas, facilitando su uso y dando acceso a todo lo necesario para empezar a realizar pruebas y desarrollar proyectos desde el momento en el que se instala. Por otro lado, existe también una versión mínima, Miniconda, que solo incluye el gestor de entornos y permite al usuario instalar únicamente lo que necesita, siendo una opción más ligera y la preferida por muchos simplemente porque, a pesar de requerir un poco más de tiempo y conocimiento en preparar el entorno de trabajo, uno puede instalar específicamente solo lo que necesita.
+
+La gran ventaja de Conda es que gestiona no solo paquetes de Python, sino también dependencias que no son de Python (como librerías de C o compiladores), lo que simplifica mucho la instalación de paquetes complejos como PyTorch. Sin embargo, una de sus desventajas es que utiliza sus propios repositorios de paquetes, que a veces no están tan actualizados como el repositorio oficial de Python (PyPI). Además, compartir y replicar entornos de forma exacta puede ser menos directo que con herramientas más modernas como Poetry.
+
 \subsection{Jupyter Notebook}
+% Entorno de desarrollo de Python interactivo que se equipara a una especie de cuaderno interactivo. En este "cuaderno" el usuario es capaz de mezclar tanto código python como texto excrito con Markdown para realizar explicaciones acerca del código o explicar ciertos añadidos a este. Es muy utlizado sobretodo en la comunidad científica y cuando se quiere realizar prototipado de modelos principalemente porque es muy simple, todo lo que haces se guarda de forma temporal en memoria y puedes reeditar tu código o añadir más código sin tener que reejecutar todo este desde cero, ahorrando el hecho de por ejemplo, reentrenar un modelo entero si lo único que querías cambiar era cómo se ve una gráfica de resultados o, tener que cargar de vuelta en memoria todo un dataset grande para comprobar si la forma en la que lo procesas es correcta. Es muy útil para este tipo de tareas donde reejetuar ciertas operaciones es costoso y uno quiere realizar pruebas rápidas con ciertos componentes o funcionalidades.
+% En este caso se ha usado principalemente para realizar experimentos de todo tipo a lo largo del proyecto, desde probar a cómo filtrar los datos, a la construcción del modelo, mejora de este, pruebas de descarga de apks para la creación del dataset propio, pruebas con la extracción de características, la contrucción del mismo dataset, la representación de los resultados e inclso pruebas de análsis e interpretabilidad. Es una herramietna muy util que ahoorra mucho tiempo en este tipo de actividades de prototipado. Aunque tiene sus errores pero sirve muy bien para su propósito.
+
+% https://jupyter.org/
+
+Un Jupyter Notebook es un entorno de desarrollo interactivo basado en una aplicación web que permite crear y compartir documentos que contienen código mixto, ecuaciones, visualizaciones y texto. Funciona como un <<cuaderno de laboratorio digital>>, donde se puede escribir y ejecutar código en bloques o "celdas" de forma independiente. Esto es extremadamente útil para el prototipado y el análisis exploratorio de datos.
+
+Su principal ventaja es la interactividad. Permite ejecutar una celda costosa (como cargar un gran dataset o entrenar un modelo) una sola vez, y luego seguir trabajando en otras celdas (como visualizar resultados o probar transformaciones) sin tener que volver a ejecutar todo el script desde el principio. Esto ahorra una cantidad de tiempo enorme, especialmente en este tipo de tareas de experimentación.
+
+Jupyter ha sido una herramienta indispensable a lo largo de todo este proyecto, especialmente en las fases de prototipado y análisis. Se utilizó para experimentar con la extracción de características, para depurar el proceso de creación del \textit{dataset}, para entrenar las primeras versiones del modelo, para visualizar los resultados con Matplotlib e incluso para ejecutar los análisis de interpretabilidad con SHAP. Fue el <<banco de pruebas>> donde se validaron la mayoría de las ideas antes de integrarlas en el código final del proyecto.
 
 \section{Librerías}
-% introducción
+
+En esta sección se describen las librerías de Python más importantes que se han utilizado a lo largo de todo el proyecto.
 
 \subsection{PyTorch vs Keras}
+
+% https://pytorch.org/
+% https://keras.io/
 
 PyTorch y Keras representan dos de los \textit{frameworks} de \textit{deep learning} más conocidos y utilizados en la actualidad. Si bien ambos facilitan la construcción de redes neuronales, cada uno toma una filosofía de diseño distinta, lo cual los hace más adecuados para diferentes tipos de proyectos y usuarios. Keras funciona como una interfaz de alto nivel, diseñada para la simplicidad y el desarrollo rápido, mientras que PyTorch opera a un nivel más bajo, ofreciendo un control granular y una mayor flexibilidad a la hora de desarrollar modelos personalizados y específicos.
 
@@ -29,23 +67,23 @@ Por el contrario, PyTorch proporciona un set de herramientas mucho más versáti
 
 En concreto, para este proyecto, PyTorch fue la elección más lógica. La arquitectura del modelo de clasificación de APKs no es convencional; se procesan un montón de cadenas de caracteres y vectores, los cuales requieren de un preprocesado específico y de la implementación de un \textit{embedder} personalizado para poder usar posteriormente dichas características junto con una lógica y control sobre el proceso de entrenamiento bastante concreto.
 
-% TODO: Fixear tabla
+% TODO: Preguntar acercade "soporte" como meter una nueva linea
 
-\begin{table}[!ht]
-	\raggedleft
-	\begin{tabular}{|l|l|l|}
-		\hline
-		\textbf{Características} & \textbf{PyTorch} & \textbf{Keras} \\ \hline
-		\textbf{Flexibilidad} & Alta, permite crear redes neuronales personalizadas y complejas. & Menos flexible, enfocado en redes estándar. \\ \hline
-		\textbf{Facilidad de uso} & Requiere más código y tiene una curva de aprendizaje más pronunciada. & Fácil de usar, ideal para desarrolladores principiantes. \\ \hline
-		\textbf{Personalización} & Excelente para redes personalizadas y modelos avanzados. & Limitada, más orientada a redes convencionales. \\ \hline
-		\textbf{Comunidad y soporte} & Muy popular en la investigación académica y proyectos avanzados. & Amplio uso en la industria por su simplicidad. \\ \hline
-		\textbf{Uso principal} & Investigación, redes neuronales complejas. & Desarrollo rápido de modelos estándar. \\ \hline
-	\end{tabular}
-	\caption{Comparativa entre PyTorch y Keras}
-\end{table}
+\tablaSmall{Comparativa entre PyTorch y Keras}{p{.25\textwidth} | p{.33\textwidth} | p{.33\textwidth}}{comparativapytorchkeras}
+{\textbf{Características} & \textbf{Pytoch} & \textbf{Keras} \\}
+{
+\textbf{Flexibilidad} & Alta, permite crear redes neuronales personalizadas y complejas. & Menos flexible, enfocado en redes estándar. \\
+\textbf{Facilidad de uso} & Requiere más código y tiene una curva de aprendizaje más pronunciada. & Fácil de usar, ideal para desarrolladores principiantes. \\
+\textbf{Personalización} & Excelente para redes personalizadas y modelos avanzados. & Limitada, más orientada a redes convencionales. \\
+\textbf{Comunidad y soporte} & Muy popular en la investigación académica y proyectos avanzados. & Amplio uso en la industria por su simplicidad. \\
+\textbf{Uso principal} & Investigación, redes neuronales complejas. & Desarrollo rápido de modelos estándar. \\
+}
 
 \subsection{NumPy, Pandas y Matplotlib}
+
+% https://numpy.org/
+% https://pandas.pydata.org/
+% https://matplotlib.org/stable/
 
 NumPy, Pandas y Matplotlib constituyen la trilogía fundamental de librerías sobre las que se edifica gran parte del ecosistema de paquetes científicos y de data science en Python.
 
@@ -54,7 +92,7 @@ NumPy, Pandas y Matplotlib constituyen la trilogía fundamental de librerías so
 	
 	\item \textbf{Pandas:} Construida sobre NumPy, Pandas introduce estructuras de datos de alto nivel, principalmente el DataFrame, una tabla bidimensional heterogénea e indexada, pensada para manejar datos tabulares y series temporales. Facilita enormemente tareas como la lectura y escritura de datos, la limpieza, el filtrado, la agregación y la transformación, siendo una herramienta muy útil estándar para el preprocesamiento de datos.
 
-	\item \textbf{Matplotlib:} Es la librería de visualización de datos por excelencia en Python. Permite elegir entre un gran repertorio de gráficos comunes como pueden ser los gráficos de barras o histogramas a, la creación de gráficos personalizados, facilitando el trabajo de representar datos complejos y hacerlos agradables a la vista.
+	\item \textbf{Matplotlib:} Es la librería de visualización de datos por excelencia en Python. Permite elegir entre un gran repertorio de gráficos comunes como pueden ser los gráficos de barras o histogramas a la creación de gráficos personalizados, facilitando el trabajo de representar datos complejos y hacerlos agradables a la vista.
 	
 \end{itemize}
 
@@ -62,43 +100,105 @@ Estas tres librerías han sido de gran ayuda en diferentes etapas del proyecto. 
 
 \subsection{scikit-learn}
 % Librería para entrenamiento de modelos clásicos de ml, proporciona una gran base de ejemplos y todo tipo de herramietnas y utilidades para trabajar con datos, entrenar y evaluar modelos de diferentes tipos, la mayor ventaja que posee es que todo los modelos y la gran mayoría de sus técnicas caen dentro de una interfaz común la cual es muy simple de entender y usar.
+% Usada para entrenar los modelos clásicos de ML (SVM, KNN, RandomForest y LogisticReg, a su vez se puede mencionar xgboost, es un paquete a parte pero está basado en scikit-learn). Además a sido muy útil en el proyecto por muchas de sus funcioes de utilidad a la hora de manejar grnades sets de datos, principalemente para el muestreo de forma justa y reproducible del dataet.
+
+% https://scikit-learn.org/stable/
+
+scikit-learn es la librería de referencia para el aprendizaje automático clásico en Python. Proporciona un conjunto enorme y bien documentado de herramientas para prácticamente cualquier tarea de \textit{machine learning}, incluyendo algoritmos de clasificación, regresión, \textit{clustering}, reducción de dimensionalidad y utilidades para el preprocesamiento de datos y la evaluación de modelos. Su mayor ventaja es su API unificada y consistente que facilita en gran medida el trabajo de entrenar modelos y trabajar con ellos: todos sus objetos (modelos, transformadores, etc.) comparten una interfaz común (\texttt{.fit()}, \texttt{.predict()}, \texttt{.transform()}), lo que hace que sea muy fácil de aprender y usar.
+
+A lo largo del proyecto, scikit-learn ha sido de gran ayuda a la hora de comparar la red neuronal con otros modelos clásicos. Se utilizó para entrenar y evaluar dicho modelos (SVM, $k$-NN, RandomForest, Regresión Logística) con los que poder comprar posteriormente la red. Además, sus funciones de utilidad, como las de división de datos (\texttt{train\_test\_split}) y cálculo de métricas (\texttt{accuracy\_score()}, \texttt{precision\_score()}, \texttt{roc\_curve()}, ...), fueron de gran ayuda para poder obtener cifras acerca del rendimiento de los distintos clasificadores.
 
 \subsection{Optuna}
-% Tuning del modelo, búsqueda inteligente de los mejores hiperparámetros para este.
+% Tuning del modelo, búsqueda inteligente de los mejores hiperparámetros para este. Explicar levemente el método que usa y decir que es muy utilizado hoy en día con redes neuroanel especificamente porque es muy cómodo a la hora de cómo bucsa la mejor combinación de parámetros. No es como un simple GridSearch o RandomSearch de scikit o algo similar, sino que construye una especie de minimodelo que aprende cómo se comporta el modelo de forma iterativa a medida que lo entrena, esto permite a Optuna cortar de forma agreisa todos aquellos caminos (decisiones) de hiperparámetros que afectan negativamente al modelo y quedarse con el más óptimo, centrando las pruebas cada vez más en obtener lo mejor combinación posble. Es una especie de búsqeuda guiada.
+% Se usa principalemtne porque es simple y provee una interfaz muy sencilla para trabajr con ello, solo es necesario crear un pequeño wrapper al modelo con los rangos de hiperpaámetros a probar y el resto se encarga optuna de realizarlo. Aunque si que es verdad  que es necesario tener cuidado proque el modelo y sus processo de entrenamiento tienen que estar bien hecho y tener en cuetna que se deberán de poder correr de forma secuencial. Esto implica que si, la librería nos da mucha flexibilidad pero también implica que tenemos que procurar que ciertas cosas como la limpieza de memoria y el error handling de ciertos tests sea hecho por noosotros.
+
+Optuna~\cite{optuna_2019} es un \textit{framework} de optimización de hiperparámetros moderno que sirve de sustituto a métodos de búsqueda tradicionales basados en fuerza bruta por una estrategia de optimización secuencial e informada. Su diseño <<\textit{define-by-run}>> lo hace extremadamente flexible y le permite integrarse de forma simple con variedad de \textit{frameworks} de aprendizaje automático como es el caso de PyTorch.
+
+Por defecto, el algoritmo que Optuna utiliza internamente es el \textit{Tree-structured Parzen Estimator}~\cite{watanabe2023tree} (TPE). Este método funciona de una manera bastante ingeniosa: en lugar de modelar directamente la probabilidad de que unos hiperparámetros den un buen resultado, se modelan dos distribuciones de probabilidad distintas. La primera, $l(x)$, representa la distribución de los hiperparámetros que han dado lugar a buenos resultados (pérdida baja), y la segunda, $g(x)$, la de aquellos que han dado lugar a malos resultados. En cada nuevo paso, Optuna busca un conjunto de hiperparámetros que sea muy probable bajo el modelo <<bueno>> y muy poco probable bajo el modelo <<malo>>, maximizando así la probabilidad de encontrar una configuración cada vez mejor. Este enfoque dirigido es mucho más eficiente que una búsqueda aleatoria y más óptimo que una búsqueda exhaustiva porque poda una gran cantidad de casos que no son necesarios probar si se conoce que parte de sus hiperparámetros no generan buenos resultados.
+
+Dado que el rendimiento de una red neuronal depende enormemente de sus hiperparámetros (tasa de aprendizaje, número de capas, etc.), se eligió Optuna para automatizar y optimizar este proceso de búsqueda. Su sencilla integración con PyTorch permitió definir un espacio de búsqueda y dejar que Optuna explorara de forma eficiente cientos de combinaciones, encontrando una configuración casi óptima en mucho menos tiempo de lo que habría llevado un enfoque manual o mediante una búsqueda exhaustiva.
+
+\subsection{SHAP (\textit{SHapley Additive exPlanations})}
+% Liberría que permite implementar un método de análisis de modelo llamado, Shapley addivide values, es una librería uy popualr puesto que esta técnica permite tanto realizar análisis locales a una predicción concreta de los modelos como de forma global a toda una población de datos. Explicar el concepto detrás de las Shap values (citar parer), mostrar las ecucaiones del problema para un ejemplo simple (el ejemplo clásico del que parte, teoría de juegos, repartir un monto de dinero entre unos participanetes de manera justa en base a su contribución al concurso), explicar luego como esto se relaciona con el ml y porque se puede hacer casi directamente la asociación de este problema a asociar el valor de la predicción final a cada una de las diferentes características de entrada en base a su contribución. Explicar cambio de las ecuaciones frente al ejemplo clásico (citar paper acerca de la adaptación a ml) y decir que la gran ventaja que esta librería aporta es el hecho de aproximaar muy bien y rápidamente el cálculo de las Shapely values. Es importante también aclaarar que las Shap values no implican directamente causalidad en la vida real (citar paper que descubrió esto) sino que solo sirven apra determinar en qué se fija el modelo, esto no se puede extrapolar a que eso sea debido a que en la vida real esa característica a su vez sea así de importante o sea justo la más decisva, simplemente evalua el cómo funciona el modelo. A su vez, es verdad que es un buen inicio para intentar buscar correlaciones pero se tiene que estudiar el tema con cuidado. 
+%Es importante destacar que esta herramietna sirve principalemente para permitir interpretar las predicciones de los distintos modelos que tenemos y para determinar en qué se fija cada uno de ellos apra realizar sus predicciones.
+
+% https://github.com/slundberg/shap
+
+SHAP (\textit{SHapley Additive exPlanations}) es una técnica de interpretabilidad de modelos que responde a una pregunta fundamental: si un modelo ha tomado una decisión, ¿cuánto ha contribuido cada una de las características de entrada a ese resultado final? Para ello, se basa en un concepto de la teoría de juegos cooperativos llamado los valores de Shapley~\cite{lundberg2017unified}. La analogía es simple: si un equipo gana un premio, ¿cómo se reparte el dinero de forma justa entre sus miembros, teniendo en cuenta la aportación de cada uno? SHAP permite resolver exactamente este problema, pero equiparando a los <<jugadores>> y al <<juego>> con las características de un modelo y su predicción respectivamente.
+
+El algoritmo funciona de una manera teóricamente muy elegante. Para calcular la contribución de una característica (por ejemplo, <<la aplicación solicita acceso a los contactos>>), SHAP considera todas las combinaciones posibles del resto de características (las <<coaliciones>>). Luego, mide cuánto cambia la predicción del modelo cuando se añade esa característica a cada una de esas coaliciones. Al promediar este <<cambio marginal>> a través de todas las coaliciones posibles, se obtiene la contribución justa y única de esa característica a la predicción final. El resultado es una explicación aditiva: la suma de las contribuciones de todas las características nos da exactamente la diferencia entre la predicción concreta y la predicción media del modelo.
+
+SHAP se utilizó para analizar e interpretar las predicciones de los distintos modelos entrenados. Permitiendo visualizar qué características (permisos, llamadas a la API del sistema, etc.) eran las más influyentes para cada modelo a la hora de clasificar una aplicación como \textit{malware}. Además, debido a su naturaleza aditiva e individual, SHAP puede ser utilizado tanto para el análisis local de una predicción concreta, como para obtener una explicación general del rendimiento del modelo y del porque de sus decisiones, convirtiéndolo en una herramienta muy útil y versátil para analizar los distintos modelos que se entrenaron.
+
+\subsection{UMAP (\textit{Uniform Manifold Approximation and Projection})}
+
+UMAP (\textit{Uniform Manifold Approximation and Projection})~\cite{mcinnes2018umap} es un algoritmo moderno de reducción de dimensionalidad basado en principios matemáticos de la topología y el aprendizaje de variedades (\textit{manifold learning}). La idea fundamental de UMAP es que la mayoría de los conjuntos de datos de alta dimensión en realidad viven en una <<variedad>> o superficie de una dimensionalidad mucho más baja que está <<curvada>> dentro de ese espacio. La misión de UMAP es encontrar esa variedad y <<desplegarla>> en un espacio de pocas dimensiones (como una hoja de papel 2D) perdiendo la menor cantidad de información estructural posible, facilitando así su visualización e interpretabilidad.
+
+Para lograrlo, su algoritmo se basa en dos etapas. Primero, construye una representación topológica de los datos en el espacio de alta dimensión. Para ello, crea un grafo ponderado donde los pesos de las aristas se calculan asumiendo que la distancia entre los puntos varía localmente a lo largo de la variedad. En la segunda etapa, busca una <<incrustación>> (\textit{embedding}) de baja dimensión de ese grafo, es decir, una disposición de los puntos en 2D o 3D, que tenga una estructura topológica lo más parecida posible. Para medir esta <<similitud>> entre el grafo de alta y baja dimensión, utiliza una función de coste basada en la entropía cruzada, que optimiza para encontrar la mejor proyección posible.
+
+Se utilizó UMAP frente a otras técnicas como t-SNE por su equilibrio entre rendimiento y calidad de la visualización. Es computacionalmente más rápido y, en general, hace un mejor trabajo preservando la estructura global de los datos. En este caso, esto era ideal para visualizar el espacio de \textit{embeddings} y confirmar que el modelo que se entrena no solo agrupaba correctamente las muestras a nivel local, sino que la separación global entre la clase <<\textit{malware}>> y la <<\textit{benigna}>> era clara y coherente.
 
 \subsection{Streamlit}
+
+% https://streamlit.io/
 
 Streamlit es un \textit{framework} de código abierto para Python, diseñado específicamente para la creación y el despliegue rápido de aplicaciones web interactivas para proyectos de \textit{data science} y aprendizaje automático. Su filosofía se basa en la simplicidad radical, permitiendo transformar \textit{scripts} convencionales con código de procesamiento de datos, modelos de IA o simples funciones aisladas en aplicaciones web funcionales con un esfuerzo y conocimiento de desarrollo web mínimos.
 
 A diferencia de \textit{frameworks} web más tradicionales y complejos como Django o Flask, que exigen la gestión de rutas, una organización de los ficheros del proyecto específica, sintaxis inusual, plantillas HTML y lógica de servidor, Streamlit permite construir una interfaz de usuario directamente desde un script normal de Python. Con comandos sencillos, se pueden añadir elementos interactivos como botones, deslizadores, gráficos y, fundamentalmente para este caso, campos para la subida de archivos. Esto acelera drásticamente el ciclo de desarrollo puesto que uno puede simplemente centrarse en obtener un modelo o set de funcionalidades que son correctas y dan buenos resultados sin preocuparse mucho de cómo se llevará luego esto a una interfaz gráfica o aplicación de escritorio / web puesto que la conversión es muy sencilla en la mayoría de casos.
 
-La finalidad de la aplicación web en este proyecto es ofrecer una demostración tangible y una especie de \textit{demo} o entorno de prueba para que cualquiera pudiera probar el clasificador de \textit{malware} de forma sencilla. El objetivo era crear una interfaz simple donde un usuario pudiera subir un archivo .apk y recibir una predicción de manera inmediata. Streamlit fue la herramienta perfecta para esta tarea, ya que permitió desarrollar esta funcionalidad en cuestión de horas en lugar de días y el resultado es más que suficiente para el alcance deseado.
+La finalidad de la aplicación web en este proyecto es ofrecer una demostración tangible y una especie de \textit{demo} o entorno de prueba para que cualquiera pudiera probar el clasificador de \textit{malware} de forma sencilla. El objetivo era crear una interfaz simple donde un usuario pudiera subir un archivo \texttt{.apk} y recibir una predicción de manera inmediata. Streamlit fue la herramienta perfecta para esta tarea, ya que permitió desarrollar esta funcionalidad en cuestión de horas en lugar de días y el resultado es más que suficiente para el alcance deseado.
 
 \subsection{Androguard y otros analizadores}
 
+% https://github.com/androguard/androguard
+% https://github.com/MobSF/Mobile-Security-Framework-MobSF
+% https://github.com/skylot/jadx
+
 Androguard es una potente herramienta de código abierto y un paquete de Python, diseñada específicamente para el análisis estático y la ingeniería inversa de aplicaciones de Android (archivos APK). Su función principal es el proceso de diseccionar un archivo APK para extraer información detallada sobre su estructura y contenido sin necesidad de ejecutar la aplicación. Una de las mayores ventajas de Androguard es el hecho de que permite además realizar todo este proceso de extracción de características de forma automatizada puesto que, expone una API de Python bastante simple e intuitiva que proporciona acceso a todos los datos que se pueden obtener de analizar las APKs.
 
-A través de Androguard, es posible acceder a componentes como el \textit{manifest} de la aplicación (AndroidManifest.xml) para analizar permisos y componentes declarados, desensamblar el código Dalvik (DEX) para inspeccionar las clases y los métodos, e incluso, extraer recursos como cadenas de texto o certificados. Aunque existen otras herramientas de análisis como MobSF (que ofrece un entorno más automatizado y visual) o Jadx (un popular descompilador), Androguard destaca por su granularidad, simplicidad de uso y su naturaleza como librería de Python.
+A través de Androguard, es posible acceder a componentes como el \textit{manifest} de la aplicación (AndroidManifest.xml) para analizar permisos y componentes declarados, desensamblar el código Dalvik (DEX) para inspeccionar las clases y los métodos e, incluso, extraer recursos como cadenas de texto o certificados. Aunque existen otras herramientas de análisis como MobSF (que ofrece un entorno más automatizado y visual) o Jadx (un popular descompilador), Androguard destaca por su granularidad, simplicidad de uso y su naturaleza como librería de Python.
 
 Una de las piedras fundamentales de este proyecto es la posibilidad de extraer características de forma estática de APKs y entrenar un modelo con ellas capaz de discernir entre aplicaciones benignas y malignas. La razón principal de su eso es el hecho de funcionar nativamente en Python y permitir la automatización de la creación del \textit{dataset} de entrenamiento del modelo. A su vez, es el componente que permite analizar muestras nuevas, obteniendo los datos que el modelo espera recibir para realizar una predicción.
 
 \section{Otras herramientas}
-% breve introdución
+
+Finalmente, en esta sección se detallan otras herramientas de software que, aunque no están directamente relacionadas con la inteligencia artificial, han sido de gran ayuda para la gestión del código, el desarrollo y la documentación del proyecto.
 
 \subsection{Docker}
+
+% https://www.docker.com/
 
 Docker es una plataforma de código abierto que permite automatizar el despliegue, la ejecución, la distribución y la gestión de aplicaciones mediante el uso de la ''containerización''. Esta herramienta permite empaquetar una aplicación y todas sus dependencias como bibliotecas, herramientas del sistema, código, comandos de ejecución, configuraciones y todo lo que uno pueda necesitar para ejecutar su aplicación en una unidad independiente y aislada llamada contenedor.
 
 El principal problema que Docker intenta resolver es el clásico ''en mi equipo funciona'', donde una aplicación se ejecuta correctamente en el entorno de un desarrollador pero falla en otro debido a diferencias en la configuración del sistema operativo o en las versiones de las dependencias, además de posibles errores en la ejecución del proyecto y diversas posibles causas. Un contenedor soluciona esto debido a que, uno puede simplemente distribuir un único archivo que describe el proceso de creación del contenedor llamado \textit{Dockerfile} (o la misma imagen del contenedor ya creado) garantizando que cualquiera podrá ejecutar el proyecto exactamente de la misma manera en cualquier máquina que soporte Docker, desde un portátil local hasta un servidor en la nube. Esto asegura la consistencia, la reproducibilidad y simplifica enormemente los flujos de trabajo desarrollo.
 
-% TODO: añadir justificación
+El entorno de este proyecto es complejo, requiriendo versiones específicas de Python y múltiples librerías (PyTorch, Androguard, etc.). Para asegurar que la aplicación web y el modelo pudieran ser ejecutados por cualquier persona sin un tedioso proceso de configuración manual, se utilizó Docker para empaquetar todo en un contenedor. Esto garantiza que el proyecto funcione de la misma manera en cualquier sistema, simplificando enormemente su despliegue y asegurando que los resultados fueran reproducibles.
 
 \subsection{GitHub}
-% Usado para hostear el repositorio de código del proyecto
+% Usado para hostear el repositorio de código del proyecto. Explicar levemetne que es un repositorio de códdigo también.
 
-\subsection{VSCode}
-% Comentar lo que es un IDE y porqué es muy útil a la hora de desarrolar y simplificar el trabajo del desarrollador.
-% IDE usado para editar el código
+% https://github.com/
+% https://github.com/dtx1007/tfg_24_25
+
+GitHub es una plataforma de desarrollo colaborativo basada en la web que utiliza el famosos sistema de control de versiones llamado Git. Permite a los desarrolladores alojar y gestionar sus repositorios de código, que son esencialmente carpetas de un proyecto con un historial completo de todos los cambios realizados. Además de alojar el código, GitHub ofrece herramientas para el seguimiento de errores, la revisión de código y la gestión de proyectos, facilitando el trabajo en equipo.
+
+Todo el código fuente del proyecto ha sido alojado en un repositorio de GitHub. Esto sirvió principalmente para tener un espacio compartido desde el cual poder trabajar desde diferentes equipos manteniendo la coherencia de los archivos. Además, sirvió como copia de seguridad por si acaso algo salía mal y era necesario recuperar los archivos de versiones anteriores.
+
+\subsection{Visual Studio Code (VSCode)}
+% Comentar lo que es un IDE y porqué es muy útil a la hora de desarrolar y simplificar el trabajo del desarrollador. Es un IDE modular, tiene un montón de extensiones y es bastante liviano y rápdio lo cual lo permite en una herramienta con una base muy buena y que además es extensible, haciendo que sea de gran ayuda en la gran mayoría de casos. Mencionar a Jetbrains como una alternativa muy buena y en concreto a Pytorch que es su editor más orientado hacia la programación en Python.
+% IDE usado para editar el código 
+
+% https://code.visualstudio.com/
+% https://www.jetbrains.com/es-es/pycharm/
+
+Visual Studio Code (VSCode) es un editor de código fuente liviano y simple muy utililzado en el mundo del desarrollo gracias a su diseño mínimo, velocidad su carácter modular. El editor en sí es bastante completo y sirve perfectamente para su propósito pero, lo que lo eleva al siguiente nivel es su enorme ecosistema de extensiones que permiten adaptarlo para trabajar con prácticamente cualquier lenguaje o tecnología. Una alternativa muy popular en el mundo de Python es la suite de JetBrains, especialmente su IDE PyCharm.
+
+VSCode fue el editor de código principal utilizado para el desarrollo de todo el proyecto. Su flexibilidad, su excelente soporte para Python y sus extensiones para Docker y Jupyter lo convirtieron en la herramienta ideal para gestionar las diferentes facetas del trabajo desde un único lugar.
 
 \subsection{TeXstudio}
-% IDE usado para editar la memoria y anexos (documentación del proyecto). Dicha documentación está en LaTeX y se usa este programa para poder editarla de forma mucho más cómoda y sencilla.
+
+% https://www.texstudio.org/
+
+TeXstudio es un Entorno de Desarrollo Integrado (IDE) diseñado específicamente para la creación de documentos con \LaTeX. \LaTeX\ es un sistema de composición de textos de alta calidad, muy utilizado en el mundo académico y científico para la escritura de artículos, tesis y libros, ya que maneja de forma excepcional las fórmulas matemáticas, las referencias cruzadas y la maquetación profesional. TeXstudio facilita el trabajo con \LaTeX\ al proporcionar un visor de PDF integrado, autocompletado de comandos, resaltado de sintaxis y otras herramientas que agilizan y simplifican el proceso de escritura.
+
+Toda la documentación de este proyecto, incluyendo esta memoria y sus anexos, ha sido escrita en \LaTeX utilizando la plantilla proporcionada por la universidad~\cite{UBU2024ubutfgm}. TeXstudio fue la herramienta elegida para esta tarea, ya que su entorno integrado hizo mucho más cómodo y eficiente el proceso de redactarla.
