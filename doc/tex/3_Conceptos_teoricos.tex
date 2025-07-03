@@ -79,7 +79,7 @@ Los clasificadores clásicos de aprendizaje automático son aquellos modelos que
 	
 	\item \textbf{$k$-Vecinos más cercanos (\textit{$k$-Nearest Neighbors} o $k$-NN):} A diferencia de otros modelos, k-NN es un algoritmo <<perezoso>> (\textit{lazy learner}), ya que no aprende una función como tal durante su entrenamiento. Simplemente, almacena todo el conjunto de datos de entrenamiento. Para clasificar una nueva muestra, busca las $k$ muestras más similares (sus <<vecinos más cercanos>>) en el conjunto de entrenamiento, basándose en una métrica de distancia como puede ser la distancia euclídea, la distancia de Manhattan o la distancia de Hamming. La clase de la nueva muestra se asigna por votación mayoritaria entre las clases de esos $k$ vecinos.~\cite{cover1967nearest}
 	
-	\item \textbf{Máquinas de soporte vectorial (\textit{Support Vector Machines} o SVM):} El objetivo de un SVM es encontrar el hiperplano óptimo que separe las distintas clases que se desean predecir en el espacio de características del conjunto de datos con el mayor margen posible. Dicho <<margen>> es la distancia entre el hiperplano de decisión y los puntos de datos más cercanos de cada clase, llamados <<vectores de soporte>>. Al maximizar este margen, el modelo logra una mejor capacidad de generalización. Para problemas que no son linealmente separables, los SVM pueden utilizar lo que se conoce como el \textit{kernel trick}, el cual consiste en mapear los datos a un espacio de mayor dimensión donde sí se pueda encontrar un hiperplano que separe las clases correctamente.~\cite{cortes1995support}
+	\item \textbf{Máquinas de soporte vectorial (\textit{Support Vector Machines} o SVM):} El objetivo de un SVM es encontrar el hiperplano óptimo que separe las distintas clases que se desean predecir en el espacio de características del conjunto de datos con el mayor margen posible. Dicho <<margen>> es la distancia entre el hiperplano de decisión y los puntos de datos más cercanos de cada clase, llamados <<vectores de soporte>>. Al maximizar este margen, el modelo logra una mejor capacidad de generalización. Para problemas que no son linealmente separables, los SVM pueden utilizar lo que se conoce como el \textit{kernel trick}, el cual consiste en mapear los datos a un espacio de mayor dimensión donde sí se pueda encontrar un hiperplano que separe las clases correctamente~\cite{cortes1995support}.
 
 	\item \textbf{Regresión logística:} A pesar de su nombre, la regresión logística es un modelo de clasificación lineal estadístico bastante usado y que funciona sorprendentemente bien pese a su simplicidad. Se basa en estimar la probabilidad de que una muestra pertenezca a una clase determinada. Lo hace aplicando la función logística (o sigmoide) a una combinación lineal de las características de entrada. El resultado es un valor entre 0 y 1, que puede interpretarse como una probabilidad. Un umbral de decisión (típicamente 0.5) se utiliza para asignar la muestra a una de las dos clases.
 \end{itemize}
@@ -115,15 +115,15 @@ Para saber si un modelo de clasificación funciona bien, no basta con mirar su p
 	
 	\item \textbf{Falso positivo (FP - \textit{False Positive}):} El modelo predice incorrectamente que una muestra es positiva (p. ej., predice <<\textit{malware}>> y la aplicación es benigna). También se conoce como \textbf{error de tipo I}.
 	
-	\item \textbf{Verdadero negativo (TN - \textit{True Negative}):} El modelo predice correctamente que una muestra es negativa (p. ej., predice "benigno" y la aplicación es benigna).
+	\item \textbf{Verdadero negativo (TN - \textit{True Negative}):} El modelo predice correctamente que una muestra es negativa (p. ej., predice <<benigno>> y la aplicación es benigna).
 	
-	\item \textbf{Falso negativo (FN - \textit{False Negative}):} El modelo predice incorrectamente que una muestra es negativa (p. ej., predice "benigno" y la aplicación es \textit{malware}). También se conoce como \textbf{error de tipo II}.
+	\item \textbf{Falso negativo (FN - \textit{False Negative}):} El modelo predice incorrectamente que una muestra es negativa (p. ej., predice <<benigno>> y la aplicación es \textit{malware}). También se conoce como \textbf{error de tipo II}.
 \end{itemize}
 
 A partir de estos valores, se calculan las siguientes métricas:
 
 \begin{itemize}
-	\item \textbf{Exactitud (\textit{Accuracy}):} Es la métrica más intuitiva, representa el porcentaje total de aciertos. Aunque útil, puede ser muy engañosa en escenarios con clases desbalanceadas. Un 99\% de exactitud suena genial, pero si solo el 1\% de las muestras son \textit{malware}, un modelo que siempre predice "benigno" lograría esa cifra sin aportar ningún valor.
+	\item \textbf{Exactitud (\textit{Accuracy}):} Es la métrica más intuitiva, representa el porcentaje total de aciertos. Aunque útil, puede ser muy engañosa en escenarios con clases desbalanceadas. Un 99\% de exactitud suena genial, pero si solo el 1\% de las muestras son \textit{malware}, un modelo que siempre predice <<benigno>> lograría esa cifra sin aportar ningún valor.
 
 	\[Accuracy =\frac{TP + TN}{TP + FP + TN + FN}\]
 	
@@ -180,7 +180,7 @@ Más allá de las métricas individuales, existen dos curvas de evaluación muy 
 		\item \textbf{A medida que la curva crece:} Un crecimiento rápido hacia arriba significa que el modelo está ganando mucha sensibilidad sin un coste alto de falsos positivos, lo cual es ideal. Si la curva se desplaza demasiado hacia la derecha, significa que para encontrar más positivos, el modelo está cometiendo demasiadas falsas alarmas.
 	\end{itemize}
 	
-	\item \textbf{Curva PR (Precisión-Sensibilidad o \textit{Precision-Recall}):} Aunque la curva ROC es muy útil, puede ser engañosa en problemas con un gran desbalance de clases (por ejemplo, cuando la clase positiva es muy rara). En estos casos, la curva PR suele ser más informativa. Cómo su nombre indica, la curva se obtiene de enfrentar la precisión (eje Y) con la sensibilidad (eje X).
+	\item \textbf{Curva PR (Precisión-Sensibilidad o \textit{Precision-Recall}):} Aunque la curva ROC es muy útil, puede ser engañosa en problemas con un gran desbalance de clases (por ejemplo, cuando la clase positiva es muy rara). En estos casos, la curva PR suele ser más informativa. Cómo su nombre indica, la curva se obtiene de enfrentar la precisión (eje $Y$) con la sensibilidad (eje $X$).
 	
 	Interpretación:
 	

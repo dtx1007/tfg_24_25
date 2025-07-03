@@ -424,12 +424,16 @@ Vº. Bº. del Tutor:\\[2cm]
 % Abstract en castellano
 \renewcommand*\abstractname{Resumen}
 \begin{abstract}
-En este primer apartado se hace una \textbf{breve} presentación del tema que se aborda en el proyecto.
+	
+El crecimiento exponencial del sistema operativo Android lo ha convertido en el principal objetivo del \textit{software} malicioso. Este trabajo aborda el desarrollo de un sistema de detección de \textit{malware} para Android basado en inteligencia artificial y análisis estático, un enfoque que permite evaluar la seguridad de las aplicaciones sin necesidad de ejecutarlas. El proyecto se desarrolló en dos fases: una primera de prototipado para validar la viabilidad del enfoque, y una segunda de ingeniería en la que se construyó un \textit{pipeline} completo, incluyendo la creación de un \textit{dataset} propio con 20\,000 aplicaciones y el desarrollo de un modelo de red neuronal a medida.
+
+Los resultados demuestran la alta eficacia del sistema, con modelos capaces de alcanzar un \textit{recall} y un \textit{$F_1$-Score} superiores al 98\%. La conclusión más relevante del trabajo es el papel fundamental del \textit{embedder} de la red neuronal, un componente que transforma los datos brutos en una representación numérica de alta calidad. Este \textit{embedder} no solo permite que la red neuronal funcione, sino que, al ser utilizado como preprocesador para algoritmos de aprendizaje automático clásicos (como XGBoost o Regresión Logística), potencia su rendimiento a niveles excepcionales, demostrando el poder de las arquitecturas híbridas.
+
 \end{abstract}
 
 \renewcommand*\abstractname{Descriptores}
 \begin{abstract}
-Palabras separadas por comas que identifiquen el contenido del proyecto Ej: servidor web, buscador de vuelos, android \ldots
+detección de \textit{malware}, android, análisis estático, inteligencia artificial, redes neuronales, aprendizaje profundo, \textit{embeddings}, interpretabilidad de modelos, SHAP, ciberseguridad.
 \end{abstract}
 
 \clearpage
@@ -437,12 +441,16 @@ Palabras separadas por comas que identifiquen el contenido del proyecto Ej: serv
 % Abstract en inglés
 \renewcommand*\abstractname{Abstract}
 \begin{abstract}
-A \textbf{brief} presentation of the topic addressed in the project.
+
+The exponential growth of the Android operating system has made it the primary target for malicious software. This project addresses the development of a malware detection system for Android based on artificial intelligence and static analysis, an approach that allows for the assessment of application security without the need for execution. The project was carried out in two phases: an initial prototyping phase to validate the approach's feasibility, and a second engineering phase in which a complete pipeline was built, including the creation of a custom dataset with 20,000 applications and the development of a tailored neural network model.
+
+The results demonstrate the high effectiveness of the system, with models capable of achieving recall and F1-Score metrics exceeding 98\%. The most significant conclusion of this work is the fundamental role of the neural network's embedder, a component that transforms raw data into a high-quality numerical representation. This embedder not only enables the neural network to function but also, when used as a preprocessor for classical machine learning algorithms (such as XGBoost or Logistic Regression), boosts their performance to exceptional levels, showcasing the power of hybrid architectures.
+
 \end{abstract}
 
 \renewcommand*\abstractname{Keywords}
 \begin{abstract}
-keywords separated by commas.
+malware detection, android, static analysis, artificial inteligence, neural network, deep learning, embeddings, model interpretability, SHAP, cibersecurity.
 \end{abstract}
 
 \clearpage
