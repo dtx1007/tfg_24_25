@@ -4,12 +4,12 @@
 
 ## 📋 Índice
 
-- [🔎 ¿Qué es?](#-qué-es)
-- [⌛ Historia](#-historia)
-- [🐋 Despliegue](#-despliegue)
-- [🔧 Desarrollo](#-desarrollo)
-- [📜 Licencia](#-licencia)
-- [🌟 Menciones y agradecimientos](#-menciones-y-agradecimientos)
+- 🔎 [¿Qué es?](#-qué-es)
+- ⌛ [Historia](#-historia)
+- 🐋 [Despliegue](#-despliegue)
+- 🔧 [Desarrollo](#-desarrollo)
+- 📜 [Licencia](#-licencia)
+- 🌟 [Menciones y agradecimientos](#-menciones-y-agradecimientos)
 
 ## 🔎 ¿Qué es?
 
