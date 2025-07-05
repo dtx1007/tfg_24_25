@@ -1,7 +1,5 @@
 \capitulo{4}{Técnicas y herramientas}
 
-% TODO: Los links a las distintas aplicaciones deberían ir en el pie de página o en la bibliografía; lo mismo con la plantilla de latex
-
 En este apartado se comentan y analizan las diferentes herramientas y técnicas usadas en la realización de este proyecto.
 
 \section{Lenguajes y entorno de programación}
@@ -65,9 +63,7 @@ Por el contrario, PyTorch proporciona un set de herramientas mucho más versáti
 
 En concreto, para este proyecto, PyTorch fue la elección más lógica. La arquitectura del modelo de clasificación de APKs no es convencional; se procesan un montón de cadenas de caracteres y vectores, los cuales requieren de un preprocesado específico y de la implementación de un \textit{embedder} personalizado para poder usar posteriormente dichas características junto con una lógica y control sobre el proceso de entrenamiento bastante concreto.
 
-% TODO: Preguntar acercade "soporte" como meter una nueva linea
-
-\tablaSmall{Comparativa entre PyTorch y Keras}{p{.25\textwidth} | p{.33\textwidth} | p{.33\textwidth}}{comparativapytorchkeras}
+\tablaSmall{Comparativa entre PyTorch y Keras}{p{.25\textwidth} p{.33\textwidth}  p{.33\textwidth}}{comparativapytorchkeras}
 {\textbf{Características} & \textbf{Pytoch} & \textbf{Keras} \\}
 {
 \textbf{Flexibilidad} & Alta, permite crear redes neuronales personalizadas y complejas. & Menos flexible, enfocado en redes estándar. \\
@@ -124,13 +120,13 @@ SHAP se utilizó para analizar e interpretar las predicciones de los distintos m
 
 Es importante destacar que SHAP es una herramienta muy buena para analizar el funcionamiento interno y las razones por las cuales un modelo concreto decide y sirve muy bien para ver en qué se basa este. SHAP no es una herramienta que se pueda utilizar como fuente fiable para validar relaciones de causalidad~\cite{shapNotCausal}, es decir, que un modelo prediga un valor para un problema en función de ciertas características, no implica que esas características sean necesariamente la razón por la cual, en la vida real, este sea el factor determinante. 
 
-\subsection{UMAP (\textit{Uniform Manifold Approximation and Projection})}
+\subsection{umap-learn}
 
-UMAP (\textit{Uniform Manifold Approximation and Projection})~\cite{mcinnes2018umap} es un algoritmo moderno de reducción de dimensionalidad basado en principios matemáticos de la topología y el aprendizaje de variedades (\textit{manifold learning}). La idea fundamental de UMAP es que la mayoría de los conjuntos de datos de alta dimensión en realidad viven en una <<variedad>> o superficie de una dimensionalidad mucho más baja que está <<curvada>> dentro de ese espacio. La misión de UMAP es encontrar esa variedad y <<desplegarla>> en un espacio de pocas dimensiones (como una hoja de papel 2D) perdiendo la menor cantidad de información estructural posible, facilitando así su visualización e interpretabilidad.
+umap-learn es la librería de Python de referencia para aplicar el algoritmo de reducción de dimensionalidad UMAP (\textit{Uniform Manifold Approximation and Projection})~\cite{mcinnes2018umap-learn}. Su principal propósito es proporcionar una herramienta práctica y eficiente para tomar datos de alta dimensionalidad, como pueden ser los vectores de características generados por un \textit{embedder}, y proyectarlos en un espacio de dos o tres dimensiones para su visualización.
 
-Para lograrlo, su algoritmo se basa en dos etapas. Primero, construye una representación topológica de los datos en el espacio de alta dimensión. Para ello, crea un grafo ponderado donde los pesos de las aristas se calculan asumiendo que la distancia entre los puntos varía localmente a lo largo de la variedad. En la segunda etapa, busca una <<incrustación>> (\textit{embedding}) de baja dimensión de ese grafo, es decir, una disposición de los puntos en 2D o 3D, que tenga una estructura topológica lo más parecida posible. Para medir esta <<similitud>> entre el grafo de alta y baja dimensión, utiliza una función de coste basada en la entropía cruzada, que optimiza para encontrar la mejor proyección posible.
+Una de las grandes ventajas de esta librería es su diseño, el cual sigue las convenciones de la API de scikit-learn. Esto significa que cualquier persona familiarizada con el ecosistema de ciencia de datos en Python puede utilizarla de forma muy intuitiva, aplicando los métodos \texttt{.fit()} y \texttt{.transform()} para reducir la dimensionalidad de sus datos en apenas unas pocas líneas de código. Aunque el algoritmo subyacente es matemáticamente complejo, la librería lo abstrae por completo, permitiendo al usuario centrarse en la interpretación de los resultados.
 
-Se utilizó UMAP frente a otras técnicas como t-SNE por su equilibrio entre rendimiento y calidad de la visualización. Es computacionalmente más rápido y, en general, hace un mejor trabajo preservando la estructura global de los datos. En este caso, esto era ideal para visualizar el espacio de \textit{embeddings} y confirmar que el modelo que se entrena no solo agrupaba correctamente las muestras a nivel local, sino que la separación global entre la clase <<\textit{malware}>> y la <<\textit{benigna}>> era clara y coherente.
+En este proyecto, se ha utilizado la librería umap-learn para visualizar el espacio de características aprendido por el \textit{embedder} de la red neuronal. Su velocidad y su reconocida capacidad para preservar tanto la estructura local como global de los datos la convirtieron en la herramienta ideal para generar gráficos de dispersión 2D y así poder confirmar visualmente si el modelo estaba agrupando de forma coherente las aplicaciones benignas y maliciosas en regiones distintas del espacio.
 
 \subsection{Streamlit}
 
@@ -162,14 +158,13 @@ Finalmente, en esta sección se detallan otras herramientas de software que, aun
 
 % https://www.docker.com/
 
-Docker~\cite{dockerDocs} es una plataforma de código abierto que permite automatizar el despliegue, la ejecución, la distribución y la gestión de aplicaciones mediante el uso de la ''containerización''. Esta herramienta permite empaquetar una aplicación y todas sus dependencias como bibliotecas, herramientas del sistema, código, comandos de ejecución, configuraciones y todo lo que uno pueda necesitar para ejecutar su aplicación en una unidad independiente y aislada llamada contenedor.
+Docker~\cite{dockerDocs} es una plataforma de código abierto que permite automatizar el despliegue, la ejecución, la distribución y la gestión de aplicaciones mediante el uso de la <<containerización>>. Esta herramienta permite empaquetar una aplicación y todas sus dependencias como bibliotecas, herramientas del sistema, código, comandos de ejecución, configuraciones y todo lo que uno pueda necesitar para ejecutar su aplicación en una unidad independiente y aislada llamada contenedor.
 
-El principal problema que Docker intenta resolver es el clásico ''en mi equipo funciona'', donde una aplicación se ejecuta correctamente en el entorno de un desarrollador pero falla en otro debido a diferencias en la configuración del sistema operativo o en las versiones de las dependencias, además de posibles errores en la ejecución del proyecto y diversas posibles causas. Un contenedor soluciona esto debido a que, uno puede simplemente distribuir un único archivo que describe el proceso de creación del contenedor llamado \textit{Dockerfile} (o la misma imagen del contenedor ya creado) garantizando que cualquiera podrá ejecutar el proyecto exactamente de la misma manera en cualquier máquina que soporte Docker, desde un portátil local hasta un servidor en la nube. Esto asegura la consistencia, la reproducibilidad y simplifica enormemente los flujos de trabajo desarrollo.
+El principal problema que Docker intenta resolver es el clásico <<en mi equipo funciona>>, donde una aplicación se ejecuta correctamente en el entorno de un desarrollador pero falla en otro debido a diferencias en la configuración del sistema operativo o en las versiones de las dependencias, además de posibles errores en la ejecución del proyecto y diversas posibles causas. Un contenedor soluciona esto debido a que, uno puede simplemente distribuir un único archivo que describe el proceso de creación del contenedor llamado \textit{Dockerfile} (o la misma imagen del contenedor ya creado) garantizando que cualquiera podrá ejecutar el proyecto exactamente de la misma manera en cualquier máquina que soporte Docker, desde un portátil local hasta un servidor en la nube. Esto asegura la consistencia, la reproducibilidad y simplifica enormemente los flujos de trabajo desarrollo.
 
 El entorno de este proyecto es complejo, requiriendo versiones específicas de Python y múltiples librerías (PyTorch, Androguard, etc.). Para asegurar que la aplicación web y el modelo pudieran ser ejecutados por cualquier persona sin un tedioso proceso de configuración manual, se utilizó Docker para empaquetar todo en un contenedor. Esto garantiza que el proyecto funcione de la misma manera en cualquier sistema, simplificando enormemente su despliegue y asegurando que los resultados fueran reproducibles.
 
 \subsection{GitHub}
-% Usado para hostear el repositorio de código del proyecto. Explicar levemetne que es un repositorio de códdigo también.
 
 % https://github.com/
 % https://github.com/dtx1007/tfg_24_25
@@ -187,10 +182,10 @@ Visual Studio Code (VSCode)~\cite{vscodeDocs} es un editor de código fuente liv
 
 VSCode fue el editor de código principal utilizado para el desarrollo de todo el proyecto. Su flexibilidad, su excelente soporte para Python y sus extensiones para Docker~\cite{dockerDocs} y Jupyter~\cite{jupyterProject} lo convirtieron en la herramienta ideal para gestionar las diferentes facetas del trabajo desde un único lugar.
 
-\subsection{\TeX\,studio}
+\subsection{\TeX{}studio}
 
 % https://www.texstudio.org/
 
-\TeX\,studio~\cite{texstudio} es un Entorno de Desarrollo Integrado (IDE) diseñado específicamente para la creación de documentos con \LaTeX. \LaTeX\ es un sistema de composición de textos de alta calidad, muy utilizado en el mundo académico y científico para la escritura de artículos, tesis y libros, ya que maneja de forma excepcional las fórmulas matemáticas, las referencias cruzadas y la maquetación profesional. \TeX\,studio facilita el trabajo con \LaTeX\ al proporcionar un visor de PDF integrado, autocompletado de comandos, resaltado de sintaxis y otras herramientas que agilizan y simplifican el proceso de escritura.
+\TeX{}studio~\cite{texstudio} es un Entorno de Desarrollo Integrado (IDE) diseñado específicamente para la creación de documentos con \LaTeX{}. \LaTeX{} es un sistema de composición de textos de alta calidad, muy utilizado en el mundo académico y científico para la escritura de artículos, tesis y libros, ya que maneja de forma excepcional las fórmulas matemáticas, las referencias cruzadas y la maquetación profesional. \TeX{}studio facilita el trabajo con \LaTeX{} al proporcionar un visor de PDF integrado, autocompletado de comandos, resaltado de sintaxis y otras herramientas que agilizan y simplifican el proceso de escritura.
 
-Toda la documentación de este proyecto, incluyendo esta memoria y sus anexos, ha sido escrita en \LaTeX utilizando la plantilla proporcionada por la universidad~\cite{UBU2024ubutfgm}. \TeX,studio fue la herramienta elegida para esta tarea, ya que su entorno integrado hizo mucho más cómodo y eficiente el proceso de redactarla.
+Toda la documentación de este proyecto, incluyendo esta memoria y sus anexos, ha sido escrita en \LaTeX{} utilizando la plantilla proporcionada por la universidad~\cite{UBU2024ubutfgm}. \TeX{}studio fue la herramienta elegida para esta tarea, ya que su entorno integrado hizo mucho más cómodo y eficiente el proceso de redactarla.

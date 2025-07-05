@@ -1,7 +1,7 @@
 \documentclass[a4paper,12pt,twoside]{memoir}
 
 % Castellano
-\usepackage[spanish,es-tabla]{babel}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
 \selectlanguage{spanish}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -42,6 +42,7 @@
 % 2 --> Texto a pie de figura
 % 3 --> Tamaño en tanto por uno relativo al ancho de página
 \usepackage{graphicx}
+\usepackage{subcaption}
 \newcommand{\imagen}[3]{
 	\begin{figure}[!h]
 		\centering
@@ -410,14 +411,19 @@ En Burgos, {\large \today}
 
 % para casos con solo un tutor comentar lo anterior
 % y descomentar lo siguiente
-Vº. Bº. del Tutor:\\[2cm]
-%D. nombre tutor
+\begin{center}
+	Vº. Bº. del Tutor:\\[2cm]
+	Álvar Arnaiz González	
+\end{center}
 
 
-\newpage\null\thispagestyle{empty}\newpage
+\newpage\null\thispagestyle{empty}
 
+\textbf{Agradecimientos}
 
+Este trabajo se ha construido sobre dos pilares: el apoyo incondicional de mi familia, que ha sido mi ancla, y la infinita paciencia y confianza de mi tutor, que ha sido mi guía. A mis amigos, gracias por entender que mi ausencia no era olvido, sino la dedicación que este proyecto exigía, y por seguir ahí con el mismo ánimo de siempre. A todos vosotros, por ser el motor, el refugio y la razón por la que cada hora invertida en estas páginas ha merecido la pena.
 
+\newpage
 
 \frontmatter
 

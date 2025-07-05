@@ -58,7 +58,7 @@ La curva de entrenamiento (Figura \ref{fig:drebin_nn_loss_curves}) de la red neu
 
 \imagen{drebin_all_cv_distributions}{Distribuciones de las métricas de evaluación para cada modelo en la validación cruzada inicial.}{1}
 
-Al analizar las métricas de rendimiento de todos los modelos (Figura \ref{fig:drebin_all_cv_distributions}), la red neuronal obtuvo un \textit{recall} muy respetable, cercano al 97,8\%, pero no fue el mejor modelo. El XGBoost se posicionó como el claro ganador con un 99,25\% de \textit{recall}, seguido de cerca por el $k$-NN (99\%) y el RandomForest (98,75\%). Cabe destacar también que, la Regresión Logística, a pesar de su simplicidad, alcanzó un admirable 98,5\% y demostró ser el modelo con la menor varianza en sus resultados entre los diferentes \textit{folds}, lo que indica una gran estabilidad.
+Al analizar las métricas de rendimiento de todos los modelos (Figura \ref{fig:drebin_all_cv_distributions}), la red neuronal obtuvo un \textit{recall} muy respetable, cercano al $97.8\%$, pero no fue el mejor modelo. El XGBoost se posicionó como el claro ganador con un $99.25\%$ de \textit{recall}, seguido de cerca por el $k$-NN (99\%) y el RandomForest ($98.75\%$). Cabe destacar también que, la Regresión Logística, a pesar de su simplicidad, alcanzó un admirable $98.5\%$ y demostró ser el modelo con la menor varianza en sus resultados entre los diferentes \textit{folds}, lo que indica una gran estabilidad.
 
 \imagen{drebin_model_efficiency_analysis}{Análisis comparativo de la eficiencia en tiempo y espacio de los modelos iniciales.}{1}
 
@@ -104,13 +104,13 @@ Se desarrolló un \textit{script} que iteraba sobre cada una de las 20\,000 APKs
 
 \section{Adaptación y optimización del modelo final}
 
-Con el nuevo y mucho más complejo \textit{dataset} preparado, se procedió a adaptar el modelo prototipo. Sin embargo, esta etapa reveló una serie de problemas de rendimiento y diseño que no habían sido aparentes con los datos más simples del \textit{dataset} Drebin, obligando a realizar cambios importantes en el modelo y a implementar distintas optimizaciones al mismo.
+Con el nuevo y mucho más completo \textit{dataset} preparado, se procedió a adaptar el modelo prototipo. Sin embargo, esta etapa reveló una serie de problemas de rendimiento y diseño que no habían sido aparentes con los datos más simples del \textit{dataset} Drebin, obligando a realizar cambios importantes en el modelo y a implementar distintas optimizaciones al mismo.
 
 \subsection{Adaptación del modelo y problemas imprevistos}
 
 El prototipo inicial, aunque diseñado para ser extensible, no estaba para nada preparado para la escala y la diversidad del nuevo \textit{dataset}. Los primeros problemas fueron evidentes: el modelo no era capaz de procesar los nuevos tipos de características, como los vectores de enteros de los \texttt{OPCODE\_COUNTS} o la secuencia de caracteres del \texttt{FUZZY\_HASH}. Se tuvo que rediseñar el embedder para manejar estas nuevas entradas, añadiendo una capa GRU para procesar el \textit{fuzzy hash} a nivel de carácter y módulos específicos para los otros tipos de datos.
 
-Tras estas modificaciones, el modelo <<funcionaba>>, pero de manera desastrosa. Los tiempos de entrenamiento se dispararon (de 3 minutos por \textit{fold} a más de 20 minutos para una sola época), el consumo de memoria RAM también aumentó de manera drástica, requiriendo más de 256 GB, y el uso de la GPU había caido en picado, con un valores mínimos (2-3\%), mientras que la CPU estaba constantemente al 100\%. Y lo más grave: el modelo no aprendía nada. La función de pérdida explotaba a infinito tras un par de iteraciones. Estaba claro que había problemas de diseño fundamentales que la simplicidad del \textit{dataset} Drebin había ocultado.
+Tras estas modificaciones, el modelo <<funcionaba>>, pero de manera desastrosa. Los tiempos de entrenamiento se dispararon (de 3 minutos por \textit{fold} a más de 20 minutos para una sola época), el consumo de memoria RAM también aumentó de manera drástica, requiriendo más de 256 GB, y el uso de la GPU había caido en picado (2-3\%), mientras que la CPU estaba constantemente al 100\%. Y lo más grave: el modelo no aprendía nada. La función de pérdida explotaba a infinito tras un par de iteraciones. Estaba claro que había problemas de diseño fundamentales que la simplicidad del \textit{dataset} Drebin había ocultado.
 
 \subsection{Optimizaciones y soluciones de los problemas}
 
@@ -166,7 +166,7 @@ La Figura \ref{fig:nn_feature_importante} muestra la importancia global de las c
 
 \imagen{nn_beeswarm}{Gráfico beeswarm de SHAP para la Red Neuronal, mostrando el impacto de cada característica en las predicciones individuales.}{1}
 
-El gráfico \textit{beeswarm} (Figura \ref{fig:nn_beeswarm}) nos da una visión más detallada. Cada punto es una predicción, y su posición en el eje $X$ indica cómo ha afectado esa característica a la probabilidad de ser \textit{malware}. El color indica si el valor de la característica era <<alto>> o <<bajo>> (en el espacio de \textit{embeddings}). Podemos observar una clara separación: para las características más importantes, los valores "altos" (rojos) tienden a empujar la predicción hacia la derecha (mayor probabilidad de ser \textit{malware}), mientras que los <<bajos>> (azules) la empujan hacia la izquierda. Esto sugiere que el \textit{embedder} ha aprendido a mapear las características asociadas al \textit{malware} a una región específica del espacio.
+El gráfico \textit{beeswarm} (Figura \ref{fig:nn_beeswarm}) ofrece una visión más detallada. Cada punto es una predicción, y su posición en el eje $X$ indica cómo ha afectado esa característica a la probabilidad de ser \textit{malware}. El color indica si el valor de la característica era <<alto>> o <<bajo>> (en el espacio de \textit{embeddings}). Podemos observar una clara separación: para las características más importantes, los valores <<altos>> (rojos) tienden a empujar la predicción hacia la derecha (mayor probabilidad de ser \textit{malware}), mientras que los <<bajos>> (azules) la empujan hacia la izquierda. Esto sugiere que el \textit{embedder} ha aprendido a mapear las características asociadas al \textit{malware} a una región específica del espacio.
 
 \imagen{nn_heatmap}{Gráfico heatmap de SHAP, mostrando las contribuciones de las características para un conjunto de instancias.}{1}
 
@@ -190,16 +190,45 @@ Como objetivo final del proyecto, se desarrolló una demostración técnica en f
 
 Para facilitar el desarrollo y la integración con el código Python existente, se eligió Streamlit como \textit{framework} web. A diferencia de otros \textit{frameworks} más complejos, Streamlit está diseñado para transformar \textit{scripts} de datos y modelos de IA en aplicaciones interactivas con un mínimo esfuerzo, lo que lo convertía en la herramienta perfecta para este propósito.
 
+\begin{figure}[!h]
+	\centering
+	\begin{subfigure}{0.5\linewidth}
+		\includegraphics[width=\linewidth]{streamlit_app_main} 
+		\caption{Página principal}
+		\label{fig:streamlitMain}
+	\end{subfigure}\hfill
+	\begin{subfigure}{0.5\linewidth}
+		\includegraphics[width=\linewidth]{streamlit_app_extraction_3}
+		\caption{Resumen de la extracción}
+		\label{fig:streamlitExtraction}
+	\end{subfigure}
+	
+	\begin{subfigure}{0.5\linewidth}
+		\includegraphics[width=\linewidth]{streamlit_app_shap_2}
+		\caption{Análisis de interpretabilidad}
+		\label{fig:streamlitSHAP}
+	\end{subfigure}\hfill
+	\begin{subfigure}{0.5\linewidth}
+		\includegraphics[width=\linewidth]{streamlit_app_umap}
+		\caption{Análisis del espacio de \textit{embeddings}}
+		\label{fig:streamlitUMAP}
+	\end{subfigure}
+	
+	\caption{Aplicación de demostración del modelo}
+	\label{fig:streamlitApp}
+\end{figure}
+
+
 La aplicación se diseñó con una interfaz sencilla y minimalista. Un menú lateral permite al usuario subir un archivo APK y ver un historial de los análisis realizados durante la sesión. La página principal se organiza en pestañas que muestran:
 
 \begin{itemize}
-	\item Un resumen de la predicción actual.
+	\item Un resumen de la predicción actual (Figura \ref{fig:streamlitMain}).
 	
-	\item Los detalles de las características extraídas de la APK.
+	\item Los detalles de las características extraídas de la APK (Figura \ref{fig:streamlitExtraction}).
 	
-	\item Un análisis de interpretabilidad con gráficos de SHAP para el modelo seleccionado.
+	\item Un análisis de interpretabilidad con gráficos de SHAP para el modelo seleccionado (Figura \ref{fig:streamlitSHAP}).
 	
-	\item La visualización del espacio de \textit{embedding} con UMAP, mostrando dónde se sitúa la aplicación analizada.
+	\item La visualización del espacio de \textit{embedding} con UMAP, mostrando dónde se sitúa la aplicación analizada (Figura \ref{fig:streamlitUMAP}).
 \end{itemize}
 
 De esta forma, la aplicación no solo da un resultado, sino que también educa al usuario sobre el proceso interno del modelo.
@@ -208,7 +237,4 @@ De esta forma, la aplicación no solo da un resultado, sino que también educa a
 
 Para facilitar la prueba y la distribución de la aplicación, se decidió empaquetarla en un contenedor de Docker. Esto permite que cualquier persona con Docker instalado pueda ejecutar la aplicación con un único comando, sin preocuparse por instalar Python o cualquiera de las numerosas dependencias del proyecto. El \texttt{Dockerfile} se encargó de preparar el entorno utilizando Poetry para instalar los paquetes, y de iniciar el servidor de Streamlit, exponiendo el puerto correspondiente.
 
-TODO: Explicar o bien el despliegue en un servidor o bien en la nube de streamlit. Mostrar también capturas de la app.
-
-%
-%El despliegue final se realizó en un servidor de la universidad. El proceso consistió en conectarse a la red del centro mediante una VPN, acceder a la máquina remota por SSH, transferir los archivos del proyecto y, finalmente, ejecutar el contenedor Docker. Esto permitió que la aplicación fuera accesible desde dentro de la red de la universidad, completando así el ciclo de vida del proyecto desde la investigación hasta el despliegue de una herramienta funcional.
+El despliegue final se realizó en un servidor de la universidad. El proceso consistió en conectarse a la red del centro mediante una VPN, acceder a la máquina remota por SSH, transferir los archivos del proyecto mediante SCP y, finalmente, ejecutar el contenedor de Docker. Esto permitió que la aplicación fuera accesible desde dentro de la red de la universidad\footnote{Disponible en este dirección: \url{http://10.168.168.34:8501/}}, completando así el ciclo de vida del proyecto desde la investigación hasta el despliegue de una herramienta funcional.

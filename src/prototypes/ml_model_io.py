@@ -11,7 +11,7 @@ def _convert_numpy_to_list(data: Any) -> Any:
     """
     Recursively convert numpy arrays to lists in data structures.
 
-    This is necessary for JSON serialization of dictionaries or 
+    This is necessary for JSON serialization of dictionaries or
     lists containing numpy arrays.
 
     Parameters
@@ -104,14 +104,14 @@ def save_ml_models_with_metadata(
 
     # Prepare path dictionary for return value
     saved_paths = {"version_dir": version_dir}
-    
+
     # Initialize consolidated metadata
     all_models_metadata = {
         "timestamp": timestamp,
         "models": {},
         "save_best_only": save_best_only,
-        "scoring_metric": scoring_metric if save_best_only else None
-    }    # Process and save each model
+        "scoring_metric": scoring_metric if save_best_only else None,
+    }  # Process and save each model
     for model_name, model in models_to_save.items():
         # Create subdirectory for this specific model
         model_dir = os.path.join(version_dir, model_name)
@@ -129,16 +129,16 @@ def save_ml_models_with_metadata(
 
         # Extract metrics for this model
         model_results = results_to_save[model_name]
-        
+
         # Separate summary metrics (means and standard deviations) from all metrics
         summary_metrics = {}
         all_metrics = {}
-        
+
         for metric_name, metric_value in model_results.items():
             # Add to summary metrics if it's a mean or std metric
             if metric_name.startswith("mean_") or metric_name.startswith("std_"):
                 summary_metrics[metric_name] = metric_value
-            
+
             # Copy all metrics except hyperparams (saved separately)
             if metric_name != "hyperparams":
                 all_metrics[metric_name] = metric_value
@@ -173,15 +173,24 @@ def save_ml_models_with_metadata(
                 "model": os.path.relpath(model_path, version_dir),
                 "summary_metrics": os.path.relpath(summary_metrics_path, version_dir),
                 "all_metrics": os.path.relpath(all_metrics_path, version_dir),
-                "hyperparams": os.path.relpath(hyperparams_path, version_dir) if hyperparams else None,
+                "hyperparams": os.path.relpath(hyperparams_path, version_dir)
+                if hyperparams
+                else None,
             },
             "summary_metrics": {
                 metric: model_results[f"mean_{metric}"]
-                for metric in ["accuracy", "precision", "recall", "f1", "pr_auc", "roc_auc"]
+                for metric in [
+                    "accuracy",
+                    "precision",
+                    "recall",
+                    "f1",
+                    "pr_auc",
+                    "roc_auc",
+                ]
                 if f"mean_{metric}" in model_results
             },
             "model_type": type(model).__name__,
-        }    # Save consolidated metadata with information about all models
+        }  # Save consolidated metadata with information about all models
     metadata_path = os.path.join(version_dir, "metadata.json")
     with open(metadata_path, "w") as f:
         json.dump(all_models_metadata, f, indent=2)
@@ -205,7 +214,7 @@ def save_ml_models_with_metadata(
 def _resolve_ml_model_directory(version: str | None, base_dir: Path | str) -> str:
     """
     Resolve the model directory path based on version specification.
-    
+
     This helper function determines which model version to load by either:
     1. Using the explicitly specified version
     2. Finding the latest version from the version tracking file
@@ -223,7 +232,7 @@ def _resolve_ml_model_directory(version: str | None, base_dir: Path | str) -> st
     -------
     str
         Absolute path to the resolved model directory
-        
+
     Raises
     ------
     FileNotFoundError
@@ -288,7 +297,7 @@ def _load_ml_model_metadata(
         Comprehensive metadata dictionary containing model information and performance metrics
     """
     # Load version metadata file
-    metadata_path = os.path.join(version_dir, "metadata.json")
+    metadata_path = Path(version_dir, "metadata.json").resolve()
     if not os.path.exists(metadata_path):
         raise FileNotFoundError(f"Metadata file not found: {metadata_path}")
 
@@ -322,7 +331,7 @@ def _load_ml_model_metadata(
     }
 
     # Add all metrics if available
-    metrics_path = os.path.join(version_dir, model_info["paths"]["all_metrics"])
+    metrics_path = Path(version_dir, model_info["paths"]["all_metrics"]).resolve()
     if os.path.exists(metrics_path):
         with open(metrics_path, "r") as f:
             model_metadata["all_metrics"] = json.load(f)
@@ -331,7 +340,9 @@ def _load_ml_model_metadata(
 
     # Add hyperparameters if available
     if model_info["paths"]["hyperparams"]:
-        hyperparams_path = os.path.join(version_dir, model_info["paths"]["hyperparams"])
+        hyperparams_path = Path(
+            version_dir, model_info["paths"]["hyperparams"]
+        ).resolve()
         if os.path.exists(hyperparams_path):
             with open(hyperparams_path, "r") as f:
                 model_metadata["hyperparams"] = json.load(f)
@@ -374,7 +385,8 @@ def load_ml_models_from_version(
     loaded_models = {}
 
     for model_name, model_info in metadata["models"].items():
-        model_path = os.path.join(version_dir, model_info["paths"]["model"])
+        relative_model_path = model_info["paths"]["model"].replace("\\", "/")
+        model_path = Path(version_dir, relative_model_path).resolve()
 
         if not os.path.exists(model_path):
             print(f"Warning: Model file not found for {model_name}: {model_path}")
@@ -428,7 +440,8 @@ def load_ml_model_from_version(
     model_info = version_metadata["models"][model_name]
 
     # Load model
-    model_path = os.path.join(version_dir, model_info["paths"]["model"])
+    relative_model_path = model_info["paths"]["model"].replace("\\", "/")
+    model_path = Path(version_dir, relative_model_path).resolve()
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
