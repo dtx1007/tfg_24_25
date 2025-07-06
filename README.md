@@ -124,6 +124,15 @@ Este apartado está destinado a desarrolladores que deseen contribuir al proyect
 
     Una vez dentro del *shell*, podrás ejecutar los *scripts* y *notebooks* del proyecto.
 
+4. **Ejecutar aplicación web de Streamlit en local (opcional)**
+
+    En el caso de querer correr la aplicación web en local, se puede hacer facilmente mediante el siguiente comando:
+
+    ```sh
+    # Estando desde la raiz del proyecto
+    streamlit run ./src/app/malware_interpreter_app.py
+    ```
+
 **Estructura del Repositorio:**
 
 Para facilitar la navegación, aquí se presenta una descripción de los directorios más importantes:
@@ -146,7 +155,7 @@ Para facilitar la navegación, aquí se presenta una descripción de los directo
 
 ## 📜 Licencia
 
-TODO: Elegir licencia
+Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
 ## 🌟 Menciones y agradecimientos
 

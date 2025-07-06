@@ -14,6 +14,9 @@
 \RequirePackage{xtab}
 \RequirePackage{multirow}
 
+\usepackage{dirtree}
+\renewcommand\DTstylecomment{\rmfamily}
+
 % Links
 \PassOptionsToPackage{hyphens}{url}\usepackage[colorlinks]{hyperref}
 \hypersetup{
@@ -39,12 +42,10 @@
 % Imagenes
 \usepackage{graphicx}
 \usepackage{adjustbox}
-\usepackage{dirtree}
-\usepackage{svg}
-\newcommand{\imagen}[2]{
+\newcommand{\imagen}[3]{
 	\begin{figure}[!h]
 		\centering
-		\includegraphics[width=0.9\textwidth]{#1}
+		\includegraphics[width=#3\textwidth]{#1}
 		\caption{#2}\label{fig:#1}
 	\end{figure}
 	\FloatBarrier

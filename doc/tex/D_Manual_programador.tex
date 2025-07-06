@@ -1,11 +1,245 @@
 \apendice{Documentación técnica de programación}
+\label{apendice:documentacion_tecnica}
 
 \section{Introducción}
+Este apéndice sirve como manual técnico y guía para cualquier desarrollador que desee comprender, extender o contribuir a este proyecto. El objetivo es proporcionar toda la información necesaria para configurar el entorno de desarrollo, entender la estructura del código fuente, y ejecutar los procesos clave como la creación del \textit{dataset} o el entrenamiento de los modelos. Se asume que el lector tiene conocimientos de Python y está familiarizado con herramientas de desarrollo como Git y los entornos virtuales.
 
 \section{Estructura de directorios}
+A continuación se muestra y explica la estructura de directorios del repositorio principal del proyecto, alojado en GitHub\footnote{\url{https://github.com/dtx1007/TFG-Malware-Detection-Android}}.
+
+\dirtree{%
+	.1 /.
+	.2 apks/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			Directorio destinado a contener los archivos APK en bruto descargados para la creación del \textit{dataset}. También almacena el catálogo de AndroZoo (\texttt{latest.csv}). Por su gran tamaño, el contenido de este directorio no se incluye en el repositorio de Git.
+		\end{minipage}
+	}.
+	.2 dataset/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			Directorio donde se colocarían los \textit{datasets} procesados en formato \texttt{.csv} o \texttt{.pkl}, para ser utilizados por los cuadernos de entrenamiento. No se incluyen dentro del repositorio por motivos de tamaño pero se explica como generar el \textit{dataset} propio más adelante.
+		\end{minipage}
+	}.
+	.2 doc/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			Alberga toda la documentación del proyecto, incluyendo la memoria y los anexos en formato \LaTeX.
+		\end{minipage}
+	}.
+	.2 model\_artifacts/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			Directorio donde se guardan todos los artefactos generados tras el entrenamiento: los modelos de red neuronal y clásicos, los vocabularios de características, los <<escaladores>> de normalización y las métricas de rendimiento.
+		\end{minipage}
+	}.
+	.2 plots/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			Contiene todas las gráficas generadas para el análisis de resultados y la interpretabilidad de los modelos.
+		\end{minipage}
+	}.
+	.2 src/\\
+	{	
+		\vspace*{0.5em}%
+		\hspace*{1em}%
+		\begin{minipage}[t]{0.85\textwidth}
+			\normalfont
+			El corazón del proyecto. Contiene todo el código fuente en Python y los \textit{notebooks} de pruebas de Jupyter.
+		\end{minipage}
+	}.
+}
 
 \section{Manual del programador}
+Esta sección está pensada como una guía de inicio rápido para un desarrollador. Se detallará la estructura del código fuente y se explicarán los flujos de trabajo más comunes, como la creación del \textit{dataset} y el entrenamiento de los modelos.
+
+Es importante destacar que este repositorio no incluye los \textit{datasets} en bruto (APKs) ni los modelos ya entrenados debido a su gran tamaño. Para una demostración rápida con los modelos ya listos, se recomienda utilizar el \href{https://github.com/dtx1007/streamlit_malware_detection_app}{repositorio de despliegue}. Esta guía está orientada a quien desee replicar el proceso desde cero.
+
+\subsection{Explicación del código fuente}
+Todo el código se encuentra en el directorio \texttt{src/}, organizado en subdirectorios con responsabilidades claras.
+
+\subsubsection{Directorio \texttt{src/app}}
+Contiene todo el código de la aplicación web interactiva desarrollada con Streamlit.
+
+\dirtree{%
+	.1 app/.
+	.2 malware\_interpreter\_app.py.
+	.2 model\_utils.py.
+	.2 data\_utils.py.
+	.2 shap\_utils.py.
+	.2 ui\_utils.py.
+}
+
+\begin{itemize}
+	\item \textbf{malware\_interpreter\_app.py:} Es el punto de entrada de la aplicación web. Inicializa y controla la interfaz de usuario, gestiona el estado de la sesión (como el historial) y coordina las llamadas al resto de módulos para realizar el análisis cuando un usuario sube un APK.
+	
+	\item \textbf{model\_utils.py:} Encapsula la lógica de carga y uso de los modelos de IA. Contiene funciones para cargar los modelos (tanto para la red neuronal como para los modelos clásicos) desde disco usando un sistema de caché para optimizar el rendimiento, y para ejecutar las predicciones.
+	
+	\item \textbf{data\_utils.py:} Gestiona la carga de datos auxiliares necesarios para la aplicación, como el \textit{dataset} de fondo que utiliza SHAP para sus explicaciones.
+	
+	\item \textbf{shap\_utils.py:} Centraliza la lógica de interpretabilidad. Contiene las funciones para crear el <<explicador>> de SHAP y para calcular los valores de importancia de las características para una predicción concreta.
+	
+	\item \textbf{ui\_utils.py:} Módulo con funciones de ayuda para generar componentes visuales específicos, como los gráficos de SHAP o la proyección UMAP.
+\end{itemize}
+
+\subsubsection{Directorio \texttt{src/notebooks}}
+Contiene los Jupyter Notebooks, que sirven a modo de <<campo de pruebas>> para el proyecto, se utilizan para la experimentación, el prototipado y el análisis de datos.
+\dirtree{%
+	.1 notebooks/.
+	.2 download\_apks.ipynb.
+	.2 androguard\_feature\_extraction.ipynb.
+	.2 models\_training.ipynb.
+	.2 model\_intrepretability.ipynb.
+	.2 models\_stats.ipynb.
+	.2 quantize\_model.ipynb.
+	.2 hyperparameters\_optimization.ipynb.
+}
+
+\begin{itemize}
+	\item \textbf{download\_apks.ipynb:} Contiene el código para descargar los archivos APK desde AndroZoo, utilizando su catálogo para filtrar y seleccionar las muestras.
+	
+	\item \textbf{androguard\_feature\_extraction.ipynb:} Es uno de los cuadernos más importantes. Implementa el \textit{pipeline} que toma los APKs descargados, los analiza con Androguard para extraer sus características estáticas y crea con ellas el \textit{dataset} final.
+	
+	\item \textbf{models\_training.ipynb:} Contiene toda la lógica para entrenar y evaluar tanto la red neuronal como los modelos clásicos, utilizando la validación cruzada. Al finalizar, guarda los modelos y artefactos en disco.
+	
+	\item \textbf{model\_intrepretability.ipynb:} Se centra en la interpretabilidad. Carga los modelos ya entrenados y utiliza SHAP para generar los datos necesarios para las visualizaciones de diferentes gráficos como el de importancia de características, gráficos de fuerza, gráficos en cascada, etc.
+	
+	\item \textbf{models\_stats.ipynb:} Permite obtener una vista general del rendimiento de los modelos entrenados. Carga las métricas de todos los modelos entrenados y genera varios gráficos comparativos (boxplots, curvas ROC/PR, etc.).
+	
+	\item \textbf{quantize\_model.ipynb:} Cuaderno de pruebas para aplicar técnicas de cuantización al modelo de red neuronal y evaluar su impacto en el tamaño y el rendimiento.
+	
+	\item \textbf{hyperparameters\_optimization.ipynb:} Implementa el proceso de búsqueda de hiperparámetros óptimos utilizando la librería Optuna.
+\end{itemize}
+
+\subsubsection{Directorio \texttt{src/prototypes}}
+Este es el directorio más importante a nivel de código fuente. Contiene los módulos de Python que definen la arquitectura y la lógica de los modelos de IA.
+\dirtree{%
+	.1 prototypes/.
+	.2 torch\_apk\_analysis\_model.py.
+	.2 torch\_apk\_analysis\_model\_io.py.
+	.2 ml\_model.py.
+	.2 ml\_model\_io.py.
+}
+\begin{itemize}
+	\item \textbf{torch\_apk\_analysis\_model.py:} Define la arquitectura completa de la red neuronal en PyTorch, incluyendo las clases para el \texttt{APKFeatureEmbedder}, el \texttt{APKClassifier} y el modelo principal que los une. También contiene las funciones para el bucle de entrenamiento, la evaluación y la inferencia.
+	
+	\item \textbf{torch\_apk\_analysis\_model\_io.py:} Gestiona el guardado y la carga del modelo de red neuronal y todos sus metadatos asociados (vocabularios, <<escaladores>>, etc.).
+	
+	\item \textbf{ml\_model.py:} Define y entrena los modelos de aprendizaje automático clásicos (RandomForest, XGBoost, etc.) utilizando la librería scikit-learn.
+	
+	\item \textbf{ml\_model\_io.py:} Se encarga de guardar y cargar los modelos clásicos ya entrenados.
+\end{itemize}
+
+\subsubsection{Directorio \texttt{src/utils}}
+Contiene \textit{scripts} con funciones de utilidad que dan soporte al resto del proyecto.
+\dirtree{%
+	.1 utils/.
+	.2 feature\_extraction.py.
+	.2 preprocessing\_utils.py.
+	.3 vocab\_utils.py.
+}
+\begin{itemize}
+	\item \textbf{feature\_extraction.py:} Contiene la lógica del proceso de extracción de características con Androguard. Es utilizado por la aplicación web para analizar nuevas APKs.
+	
+	\item \textbf{preprocessing\_utils.py:} Contiene las funciones para preprocesar los datos extraídos (creación de vocabularios, \textit{padding}, etc.), asegurando que el tratamiento de los datos sea consistente en todo el proyecto.
+	
+	\item  \textbf{vocab\_utils.py:} Contiene funciones para la generación de los vocabularios empleados en el preprocesamiento.
+\end{itemize}
+
+\subsection{Guía de procesos comunes} \label{procesos_comunes}
+A continuación se describen los pasos para ejecutar las tareas más comunes. Se asume que el entorno de desarrollo ya está configurado (ver \ref{entorno_desarrollo}).
+
+\subsubsection{Proceso de creación del \textit{dataset}}
+\begin{enumerate}
+	\item \textbf{Obtener clave de API:} Es necesario solicitar una clave de API de AndroZoo\footnote{Instrucciones de acceso disponibles en: \url{https://androzoo.uni.lu/access}}. Una vez obtenida, crear un archivo \texttt{.env} en la raíz del proyecto con el formato \texttt{ANDROZOO\_API\_KEY=tu\_clave\_aqui}.
+	
+	\item \textbf{Descargar catálogo:} Descargar el catálogo actualizado de AndroZoo\footnote{Disponible en: \url{https://androzoo.uni.lu/static/lists/latest.csv.gz}}, descomprimirlo y guardarlo en el directorio \texttt{apks/} con el nombre \texttt{latest.csv}.
+	
+	\item \textbf{Descargar APKs:} Abrir el cuaderno \\\texttt{src/notebooks/download\_apks.ipynb}. Configurar los parámetros al final del \textit{notebook} (número de muestras, rutas de guardado) y ejecutarlo. El proceso comenzará a descargar las aplicaciones.
+	
+	\item \textbf{Extraer características:} Abrir el cuaderno \\\texttt{src/notebooks/androguard\_feature\_extraction.ipynb}. Asegurarse de que las rutas de entrada coinciden con las del paso anterior y ejecutar la celda correspondiente para crear el \textit{dataset}. El resultado se guardará por defecto en el directorio \texttt{dataset/}.
+\end{enumerate}
+
+\subsubsection{Proceso de entrenamiento del modelo}
+Con el \textit{dataset} ya creado, el entrenamiento se realiza desde el cuaderno \texttt{src/notebooks/models\_training.ipynb}. Es importante configurar correctamente las celdas iniciales, especialmente el parámetro \texttt{load\_fresh=True} la primera vez que se use un nuevo \textit{dataset} para que se preprocese y se guarde en disco una versión ya preprocesada. En ejecuciones posteriores, se puede poner en \texttt{False} para ahorrar tiempo. Tras configurar los hiperparámetros deseados, se puede ejecutar el cuaderno completo. Los modelos y artefactos resultantes se guardarán en el directorio \texttt{model\_artifacts/}.
 
 \section{Compilación, instalación y ejecución del proyecto}
+En esta sección se detallan los dos flujos principales para ejecutar el proyecto: uno para el desarrollo local y otro para el despliegue mediante Docker.
+
+\subsection{Entorno de desarrollo (local)} \label{entorno_desarrollo}
+Este es el flujo recomendado para modificar el código o entrenar nuevos modelos.
+\begin{enumerate}
+	\item \textbf{Prerrequisitos:} Asegurarse de tener instalados Python 3.11+, Git y Poetry\footnote{Documentación oficial de Poetry: \url{https://python-poetry.org/docs/}}.
+	
+	\item \textbf{Clonar el repositorio:} Descargar el código fuente desde el repositorio principal.
+	
+	\item \textbf{Instalar dependencias:} Navegar a la raíz del proyecto en un terminal y ejecutar uno de los siguientes comandos:
+	
+	\vspace*{-1em}
+	\begin{verbatim}
+		# Para CPU
+		poetry install --extras=cpu
+		# Para GPU (con CUDA)
+		poetry install --extras=gpu
+	\end{verbatim}
+	\vspace*{-1em}
+	
+	Poetry creará automáticamente un entorno virtual e instalará todos los paquetes necesarios. Se puede elegir la versión con o sin soporte para GPU. Es importante aclarar que, se ha de especificar uno de los extras o PyTorch no se instalará, impidiendo que se pueda ejecutar correctamente la aplicación o el resto de \textit{scripts} y \textit{notebooks}.
+
+	\item \textbf{Activar el entorno:} Ejecutar \texttt{poetry shell} para activar el entorno virtual. Una vez dentro, se pueden ejecutar todos los \textit{scripts} y \textit{notebooks} del proyecto.
+	
+	\item\textbf{ Desplegar aplicación en local (opcional):} Si se quisiera probar la aplicación en local solo haría falta ejecutar el siguiente comando:
+	
+	\begin{verbatim}
+		streamlit run ./src/app/malware_interpreter_app.py
+	\end{verbatim}
+	
+	Si justo se ha descargado el repositorio la aplicación dará error al intentar acceder a ella puesto que no tendrá modelos que cargar, se han de entrenar primero (ver \ref{procesos_comunes}).
+\end{enumerate}
+
+\subsection{Entorno de despliegue (Docker)}
+\label{despliegue_docker}
+Este método es el más sencillo para simplemente probar la aplicación final, ya que no requiere instalar dependencias manualmente. Se recomienda usar el <<repositorio de despliegue>>\footnote{\url{https://github.com/dtx1007/streamlit_malware_detection_app}}.
+
+\begin{enumerate}
+	\item \textbf{Requisitos previos:} Tener instalado Git, Git LFS y Docker.
+	
+	\item \textbf{Clonación y construcción:} Clona el repositorio de despliegue y construye la imagen Docker.
+	\begin{verbatim}
+		# Clona el repositorio y descarga los modelos
+		git clone ...
+		cd streamlit_malware_detection_app
+		git lfs pull
+		
+		# Construye la imagen (elegir entre con o sin soporte para GPU)
+		docker build -t streamlit-malware-app:cpu .
+		docker build --build-arg BUILD_TYPE=gpu -t streamlit-malware-app:gpu .
+	\end{verbatim}
+	
+	\item \textbf{Ejecución:} Lanza el contenedor. La aplicación será accesible en \url{http://localhost:8501}.
+	\begin{verbatim}
+		# Ejecuta el contenedor (elegir en función de si se quiere o no soporte para GPU)
+		docker run --rm -p 8501:8501 streamlit-malware-app:cpu
+		docker run --rm --gpus all -p 8501:8501 streamlit-malware-app:gpu
+	\end{verbatim}
+\end{enumerate}
 
 \section{Pruebas del sistema}
+Es importante señalar que el proyecto no cuenta con una \textit{suite} de pruebas automatizadas (como tests unitarios o de integración con \textit{frameworks} como \texttt{pytest}). La metodología de \textit{testing} se ha basado en un enfoque manual y exploratorio.
+
+Los diferentes Jupyter Notebooks han servido como el principal entorno de pruebas para cada uno de los módulos. Cada cuaderno actúa como una prueba de concepto y de funcionamiento para la lógica que contiene: el cuaderno de extracción de características valida que el análisis con Androguard funciona, el de entrenamiento valida todo el \textit{pipeline} de modelado, y así sucesivamente. Aunque este enfoque no sustituye a un sistema de pruebas automatizado, ha permitido validar cada componente de forma interactiva y asegurar que estos funcionan correctamente y que los resultados son correctos.

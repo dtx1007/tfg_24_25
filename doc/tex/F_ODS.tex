@@ -1,9 +1,44 @@
 \apendice{Anexo de sostenibilización curricular}
 
+%\section{Introducción}
+%Este anexo incluirá una reflexión personal del alumnado sobre los aspectos de la sostenibilidad que se abordan en el trabajo.
+%Se pueden incluir tantas subsecciones como sean necesarias con la intención de explicar las competencias de sostenibilidad adquiridas durante el alumnado y aplicadas al Trabajo de Fin de Grado.
+%
+%Más información en el documento de la CRUE \url{https://www.crue.org/wp-content/uploads/2020/02/Directrices_Sosteniblidad_Crue2012.pdf}.
+%
+%Este anexo tendrá una extensión comprendida entre 600 y 800 palabras.
+
 \section{Introducción}
-Este anexo incluirá una reflexión personal del alumnado sobre los aspectos de la sostenibilidad que se abordan en el trabajo.
-Se pueden incluir tantas subsecciones como sean necesarias con la intención de explicar las competencias de sostenibilidad adquiridas durante el alumnado y aplicadas al Trabajo de Fin de Grado.
 
-Más información en el documento de la CRUE \url{https://www.crue.org/wp-content/uploads/2020/02/Directrices_Sosteniblidad_Crue2012.pdf}.
+Siguiendo las <<Directrices para la introducción de la Sostenibilidad en el Curriculum>> de la CRUE~\cite{crue}, este anexo presenta una reflexión personal sobre cómo el presente Trabajo de Fin de Grado se alinea con los principios de un desarrollo sostenible. Aunque a primera vista un proyecto de ciberseguridad y \textit{software} pueda parecer alejado de los conceptos tradicionales de sostenibilidad, un análisis más profundo revela importantes conexiones con sus tres pilares fundamentales: el social, el ambiental y el económico.
 
-Este anexo tendrá una extensión comprendida entre 600 y 800 palabras.
+El objetivo de este apartado es, por tanto, analizar el impacto del proyecto a través de estas tres dimensiones y reflexionar sobre cómo, a lo largo de su desarrollo, se han adquirido y aplicado de forma práctica algunas de las competencias transversales para la sostenibilidad que la universidad busca fomentar en sus titulados.
+
+\section{Impacto de la sostenibilidad en el proyecto}
+
+La sostenibilidad, entendida de forma holística, busca un equilibrio entre la justicia social, la viabilidad económica y la calidad ambiental. Este proyecto, aunque de naturaleza técnica, tiene implicaciones en cada una de estas áreas.
+
+\subsubsection{Dimensión social y ètica}
+Este es, sin duda, el pilar donde el proyecto tiene su impacto más directo y significativo. El desarrollo de una herramienta para la detección de \textit{malware} es, en esencia, un acto de protección social en el ecosistema digital. El \textit{malware} no es solo una molestia técnica; es una herramienta que facilita el robo de datos personales, el fraude financiero, la violación de la privacidad y la desestabilización de las comunicaciones. Al crear un sistema que combate estas amenazas, el proyecto contribuye directamente a la construcción de un entorno digital más seguro y fiable para todos, un aspecto fundamental para la justicia social en la era en la que vivimos. Este enfoque se alinea con el principio ético de la sostenibilidad, que considera la protección y la seguridad de las personas como un objetivo primordial.
+
+\subsubsection{Dimensión ambiental}
+La sostenibilidad ambiental en el ámbito del \textit{software} está intrínsecamente ligada a la eficiencia energética y al uso de los recursos computacionales. En este sentido, la decisión de centrar el proyecto en el análisis estático en lugar del dinámico tiene una clara implicación ambiental. El análisis dinámico requiere la ejecución de aplicaciones en entornos controlados (\textit{sandboxes}), que a menudo son máquinas virtuales que consumen una cantidad considerable de energía. El análisis estático, al no requerir ejecución, es un método inherentemente más eficiente y con una menor huella de carbono, especialmente si se piensa en su aplicación a gran escala.
+
+Además, la conclusión final del proyecto, que aboga por un enfoque híbrido donde un \textit{embedder} de red neuronal potencia a clasificadores clásicos mucho más ligeros, también tiene una vertiente de sostenibilidad. Un modelo como la Regresión Logística o XGBoost requiere muchos menos recursos computacionales para realizar una predicción que una red neuronal profunda completa. Esto significa que, si la herramienta se desplegara en millones de dispositivos, el consumo energético agregado sería significativamente menor, contribuyendo a la sostenibilidad del ecosistema digital.
+
+\subsubsection{Dimensión económica}
+El impacto económico del \textit{malware} es devastador, causando pérdidas millonarias cada año tanto a empresas como a particulares. Un sistema de detección eficaz como el que se ha desarrollado en este trabajo contribuye a la sostenibilidad económica al prevenir el fraude, proteger los activos digitales y reducir los costes asociados a la recuperación de ciberataques. Asimismo, al tratarse de un proyecto desarrollado con herramientas de código abierto y con la intención de ser compartido bajo una licencia permisiva, se fomenta un modelo de innovación sostenible, donde el conocimiento y las herramientas se comparten para el beneficio de la comunidad, en lugar de permanecer en silos cerrados.
+
+\section{Competencias de sostenibilidad adquiridas y aplicadas}
+
+El desarrollo de este proyecto también ha sido de gran utilidad para adquirir y poner en práctica las competencias transversales para la sostenibilidad definidas por la CRUE.
+
+\begin{itemize}
+	\item \textbf{SOS1 - Contextualización crítica del conocimiento:} El proyecto no se limitó a resolver un problema técnico aislado. Fue necesario investigar y comprender la problemática social y económica del \textit{malware} a nivel global, entendiendo cómo una solución tecnológica como esta interactúa con la sociedad y puede contribuir a mitigar un riesgo que afecta a millones de personas.
+	
+	\item \textbf{SOS2 - Utilización sostenible de recursos:} Esta competencia se aplicó directamente en la elección de la metodología. Se optó por el análisis estático por ser más eficiente en recursos que el dinámico. Además, todo el proceso de optimización del modelo, que culminó en la propuesta de un enfoque híbrido más ligero, fue un ejercicio práctico de búsqueda de la solución más eficiente y, por tanto, más sostenible.
+	
+	\item \textbf{SOS3 - Participación en procesos comunitarios:} Aunque es un proyecto individual, su desarrollo se ha enmarcado dentro de la comunidad del software de código abierto. Se han utilizado herramientas creadas por la comunidad (Androguard, PyTorch, etc.) y se ha construido sobre el conocimiento de la comunidad investigadora. La intención de licenciar el proyecto de forma abierta es una forma de devolver ese valor a la comunidad, promoviendo la sostenibilidad del conocimiento compartido.
+	
+	\item \textbf{SOS4 - Aplicación de principios éticos:} La ética ha sido un pilar central. El proyecto se enfoca en proteger a los usuarios, no en explotar datos. El método de análisis estático se eligió, entre otras cosas, porque respeta la privacidad al no requerir la ejecución de la aplicación ni el acceso a los datos personales del usuario. Además, la inclusión de un módulo de interpretabilidad (SHAP) responde a la necesidad ética de que las decisiones de la IA sean transparentes y comprensibles, y no meras "cajas negras".
+\end{itemize}
