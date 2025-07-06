@@ -2,39 +2,166 @@
 
 \section{Introducción}
 
-Una muestra de cómo podría ser una tabla de casos de uso:
+Este apéndice documenta la especificación de requisitos del trabajo desarrollado. Su propósito es definir de manera formal y detallada las capacidades, características y restricciones del sistema. Se establecen los objetivos generales del proyecto, se desglosa un catálogo de requisitos funcionales y no funcionales, y finalmente, se describen los principales casos de uso que ilustran la interacción del usuario con la aplicación.
 
-% Caso de Uso 1 -> Consultar Experimentos.
-\begin{table}[p]
+\section{Objetivos generales}
+Los objetivos generales representan las metas de alto nivel que se buscaron alcanzar con la realización de este trabajo, combinando tanto las aspiraciones de investigación como los entregables prácticos.
+
+\begin{enumerate}
+	\item \textbf{Investigar el estado del arte:} Realizar un análisis de la literatura científica para comprender las técnicas actuales de detección de \textit{malware} con IA y posicionar el proyecto en el panorama actual.
+	
+	\item \textbf{Desarrollar un sistema de detección de extremo a extremo:} Construir un \textit{pipeline} completo, desde la recolección de datos y la extracción de características hasta el entrenamiento y la evaluación de un modelo funcional.
+	
+	\item \textbf{Alcanzar un alto rendimiento predictivo:} Lograr que los modelos desarrollados obtengan métricas de clasificación altas, con un enfoque especial maximizar el \textit{recall} para minimizar los falsos negativos.
+	
+	\item \textbf{Comparar diferentes arquitecturas de modelos:} Evaluar y contrastar el rendimiento de una red neuronal profunda frente a algoritmos de aprendizaje automático clásicos para obtener conclusiones sobre la eficacia de cada enfoque.
+	
+	\item \textbf{Garantizar la interpretabilidad del sistema:} Implementar técnicas que permitan explicar las decisiones de los modelos, aportando transparencia y confianza a los resultados.
+	
+	\item \textbf{Crear una aplicación de demostración:} Desarrollar una interfaz web interactiva que permita a un usuario probar y visualizar el funcionamiento de todo el sistema.
+\end{enumerate}
+
+\section{Catálogo de requisitos}
+A continuación se presenta el catálogo detallado de requisitos que el sistema debe satisfacer.
+
+\subsection{Requisitos funcionales}
+Los requisitos funcionales (RF) especifican lo que el sistema debe hacer. Describen las funcionalidades, tareas y servicios que la aplicación final debe proporcionar al usuario para cumplir con su propósito.
+
+\begin{itemize}
+	\item \textbf{RF-1: Carga de archivos APK.} El sistema debe proporcionar una interfaz que permita al usuario seleccionar y subir un archivo con formato \texttt{.apk} para su posterior análisis.
+	
+	\item \textbf{RF-2: Análisis y clasificación de la aplicación.} Una vez subida una APK, el sistema debe ejecutar el \textit{pipeline} de análisis completo. Esto incluye la extracción de características estáticas, el preprocesamiento de los datos a través del \textit{embedder} y la ejecución de la inferencia con todos los modelos entrenados (la red neuronal y los clasificadores clásicos).
+	
+	\item \textbf{RF-3: Visualización de las predicciones.} La aplicación debe presentar al usuario los resultados de la clasificación de forma clara. Debe mostrar un veredicto general y una tabla detallada con la predicción de cada modelo individual, incluyendo los porcentajes de confianza para las clases <<benigno>> y <<malicioso>>.
+	
+	\begin{itemize}
+		\item \textbf{RF-3.1: Transparencia del proceso de extracción.} Para que el proceso no sea una <<caja negra>>, la interfaz debe permitir al usuario inspeccionar las características <<brutas>> que han sido extraídas de la APK. Esto incluye las diferentes listas de permisos, actividades, servicios, receptores, así como propiedades del archivo como su tamaño o su \textit{fuzzy hash}.
+		
+		\item \textbf{RF-3.2: Visualización de datos procesados.} Además de los datos en <<bruto>>, el sistema debe mostrar la representación numérica en la que se transforman. Esto implica visualizar tanto los datos \textit{tokenizados} y escalados como el vector de \textit{embeddings} final que se introduce en los clasificadores.
+	\end{itemize}
+	
+	\item \textbf{RF-4: Interpretabilidad de las predicciones.} La aplicación debe ofrecer explicaciones sobre las decisiones del modelo. Para ello, deberá generar y mostrar un conjunto de gráficos de SHAP, incluyendo la importancia global de las características y análisis locales que detallen qué factores han influido en la predicción de la muestra actual.
+	
+	\item \textbf{RF-5: Visualización del espacio de características.} El sistema debe ser capaz de generar una proyección 2D del espacio de \textit{embeddings} mediante UMAP. En esta visualización, se debe mostrar la distribución de las muestras del \textit{dataset} de fondo y resaltar la posición de la APK recién analizada, permitiendo al usuario entender su ubicación relativa respecto a las clases conocidas.
+	
+	\item \textbf{RF-6: Gestión del historial de análisis.} El sistema debe mantener un historial de las aplicaciones analizadas durante la sesión activa del usuario. La interfaz debe permitir al usuario seleccionar una entrada del historial para volver a cargar sus resultados y ofrecer una opción para borrar todo el historial de la sesión.
+\end{itemize}
+
+\subsection{Requisitos no funcionales}
+Los requisitos no funcionales (RNF) describen los atributos de calidad y las restricciones bajo las cuales el sistema debe operar. No se refieren a qué hace el sistema, sino a <<cómo>> lo hace, definiendo aspectos como su rendimiento, fiabilidad o portabilidad.
+
+\begin{itemize}
+	\item \textbf{RNF-1: Rendimiento y fiabilidad de los modelos.} Los distintos clasificadores deben alcanzar un alto nivel de rendimiento, definido por métricas de evaluación estándar. Específicamente, se establece como requisito clave obtener una métrica de \textit{recall} cercana al 98\%, garantizando una detección muy alta de las muestras maliciosas.
+	
+	\item \textbf{RNF-2: Eficiencia del análisis.} El tiempo total desde que el usuario sube una APK hasta que recibe un resultado completo (incluyendo la extracción, el preprocesamiento y la inferencia) debe ser razonable para una buena experiencia de usuario, idealmente completándose en menos de un par de minutos.
+	
+	\item \textbf{RNF-3: Portabilidad y facilidad de despliegue.} Todo el sistema, incluyendo la aplicación web, el modelo y sus dependencias, debe estar empaquetado en un contenedor Docker. Esto asegura que la aplicación sea portable y pueda ser desplegada de forma sencilla y consistente en diferentes sistemas operativos.
+	
+	\item \textbf{RNF-4: Usabilidad de la interfaz.} La aplicación web debe tener una interfaz de usuario clara, intuitiva y fácil de navegar para un perfil de usuario con conocimientos técnicos, pero no necesariamente experto en inteligencia artificial. La información debe presentarse de forma organizada y comprensible.
+	
+	\item \textbf{RNF-5: Modularidad del código.} La base de código del proyecto debe seguir un diseño modular que separe claramente las distintas responsabilidades (extracción de datos, arquitectura del modelo, entrenamiento, etc.). Esto facilita el mantenimiento, la experimentación y el posible desarrollo futuro del sistema.
+\end{itemize}
+
+\section{Casos de uso}
+Los casos de uso describen las interacciones entre un actor (en este caso, el <<Usuario/Analista>>) y el sistema para alcanzar un objetivo. A continuación se presenta un diagrama esquemático (Figura \ref{fig:use_cases_diagram}) y se detallan los tres casos de uso principales.
+
+% Diagrama Esquelético de Casos de Uso:
+% Actor: Usuario/Analista
+% Casos de Uso:
+% 1. (Usuario/Analista) -> Analizar una aplicación APK
+% 2. (Usuario/Analista) -> Interpretar resultados de una predicción
+% 3. (Usuario/Analista) -> Gestionar historial de análisis
+
+\begin{table}[H]
 	\centering
 	\begin{tabularx}{\linewidth}{ p{0.21\columnwidth} p{0.71\columnwidth} }
 		\toprule
-		\textbf{CU-1}    & \textbf{Ejemplo de caso de uso}\\
+		\textbf{CU-1}    & \textbf{Analizar una nueva aplicación APK}\\
 		\toprule
 		\textbf{Versión}              & 1.0    \\
-		\textbf{Autor}                & Alumno \\
-		\textbf{Requisitos asociados} & RF-xx, RF-xx \\
-		\textbf{Descripción}          & La descripción del CU \\
-		\textbf{Precondición}         & Precondiciones (podría haber más de una) \\
+		\textbf{Autor}                & David Cezar Toderas \\
+		\textbf{Requisitos asociados} & RF-1, RF-2, RF-3 \\
+		\textbf{Descripción}          & El usuario sube un archivo APK al sistema para que este sea analizado por los modelos de IA y se muestren los resultados de la clasificación. \\
+		\textbf{Precondición}         & El usuario tiene un archivo \texttt{.apk} válido y la aplicación web está en ejecución. \\
 		\textbf{Acciones}             &
 		\begin{enumerate}
 			\def\labelenumi{\arabic{enumi}.}
 			\tightlist
-			\item Pasos del CU
-			\item Pasos del CU (añadir tantos como sean necesarios)
+			\item El usuario accede a la aplicación web.
+			\item El usuario arrastra y suelta un archivo APK en la zona de carga o lo selecciona mediante el explorador de archivos.
+			\item El usuario presiona el botón <<Analizar APK>>.
+			\item El sistema procesa el archivo: extrae las características, las pasa por el \textit{embedder} y realiza la inferencia con todos los modelos.
+			\item La interfaz se actualiza para mostrar la pestaña de <<Predicciones>> con el veredicto de cada modelo.
+			\item El análisis se añade al historial de la sesión.
 		\end{enumerate}\\
-		\textbf{Postcondición}        & Postcondiciones (podría haber más de una) \\
-		\textbf{Excepciones}          & Excepciones \\
-		\textbf{Importancia}          & Alta o Media o Baja... \\
+		\textbf{Postcondición}        & Se muestra una predicción de clasificación para la APK subida. \\
+		\textbf{Excepciones}          & \textbf{E-1.1:} Si el archivo subido no es un APK válido, el sistema muestra un mensaje de error. \newline \textbf{E-1.2:} Si el archivo supera el límite de tamaño, el sistema muestra una advertencia y no permite el análisis. \\
+		\textbf{Importancia}          & Alta \\
 		\bottomrule
 	\end{tabularx}
-	\caption{CU-1 Nombre del caso de uso.}
+	\caption{CU-1 Analizar una nueva aplicación APK.}
 \end{table}
 
-\section{Objetivos generales}
 
-\section{Catálogo de requisitos}
+\begin{table}[H]
+	\centering
+	\begin{tabularx}{\linewidth}{ p{0.21\columnwidth} p{0.71\columnwidth} }
+		\toprule
+		\textbf{CU-2}    & \textbf{Interpretar el resultado de un análisis}\\
+		\toprule
+		\textbf{Versión}              & 1.0    \\
+		\textbf{Autor}                & David Cezar Toderas \\
+		\textbf{Requisitos asociados} & RF-3.1, RF-3.2, RF-4, RF-5 \\
+		\textbf{Descripción}          & Tras analizar un APK, el usuario explora las diferentes pestañas de la interfaz para comprender en profundidad el resultado y el razonamiento del modelo. \\
+		\textbf{Precondición}         & Se ha completado con éxito un análisis (CU-1). \\
+		\textbf{Acciones}             &
+		\begin{enumerate}
+			\def\labelenumi{\arabic{enumi}.}
+			\tightlist
+			\item El usuario navega a la pestaña <<Características Extraídas>> para ver los datos brutos y procesados.
+			\item El usuario navega a la pestaña <<Explicaciones>> para visualizar los gráficos de importancia de características de SHAP.
+			\item El usuario navega a la pestaña <<UMAP>> para ver la proyección del \textit{embedding} de la aplicación analizada.
+		\end{enumerate}\\
+		\textbf{Postcondición}        & El usuario obtiene una visión detallada de los datos y las justificaciones que respaldan la predicción del modelo. \\
+		\textbf{Excepciones}          & Ninguna. \\
+		\textbf{Importancia}          & Alta \\
+		\bottomrule
+	\end{tabularx}
+	\caption{CU-2 Interpretar el resultado de un análisis.}
+\end{table}
 
-\section{Especificación de requisitos}
+\begin{table}[H]
+	\centering
+	\begin{tabularx}{\linewidth}{ p{0.21\columnwidth} p{0.71\columnwidth} }
+		\toprule
+		\textbf{CU-3}    & \textbf{Gestionar el historial de análisis}\\
+		\toprule
+		\textbf{Versión}              & 1.0    \\
+		\textbf{Autor}                & David Cezar Toderas \\
+		\textbf{Requisitos asociados} & RF-6 \\
+		\textbf{Descripción}          & El usuario interactúa con el historial de análisis de la sesión actual para consultar resultados anteriores o para limpiar la lista. \\
+		\textbf{Precondición}         & Se ha analizado al menos una aplicación durante la sesión actual. \\
+		\textbf{Acciones}             &
+		\textbf{Flujo A: Consultar un análisis anterior}
+		\begin{enumerate}
+			\def\labelenumi{\arabic{enumi}.}
+			\tightlist
+			\item El usuario hace clic sobre el nombre de un archivo en la lista del <<Historial de Análisis>>.
+			\item El sistema carga en la vista principal todos los datos y resultados correspondientes a ese análisis.
+		\end{enumerate}
+		\textbf{Flujo B: Limpiar el historial}
+		\begin{enumerate}
+			\def\labelenumi{\arabic{enumi}.}
+			\tightlist
+			\item El usuario hace clic en el botón <<Limpiar Historial>>.
+			\item El sistema borra todas las entradas del historial de la sesión.
+		\end{enumerate}\\
+		\textbf{Postcondición}        & \textbf{Flujo A:} La interfaz muestra los resultados del análisis seleccionado. \newline \textbf{Flujo B:} La lista del historial de análisis queda vacía. \\
+		\textbf{Excepciones}          & Ninguna. \\
+		\textbf{Importancia}          & Media \\
+		\bottomrule
+	\end{tabularx}
+	\caption{CU-3 Gestionar el historial de análisis.}
+\end{table}
 
-
+\imagen{use_cases_diagram}{Diagrama de casos de uso de la aplicación de análisis de \textit{malware}.}

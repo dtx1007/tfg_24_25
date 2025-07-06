@@ -1,7 +1,7 @@
 \documentclass[a4paper,12pt,twoside]{memoir}
 
 % Castellano
-\usepackage[spanish,es-tabla]{babel}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
 \selectlanguage{spanish}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -38,6 +38,9 @@
 
 % Imagenes
 \usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{dirtree}
+\usepackage{svg}
 \newcommand{\imagen}[2]{
 	\begin{figure}[!h]
 		\centering
@@ -100,7 +103,7 @@
 %
 % Nuevo comando para tablas pequeñas (menos de una página).
 \newcommand{\tablaSmall}[5]{%
- \begin{table}
+ \begin{table}[h!]
   \begin{center}
    \rowcolors {2}{gray!35}{}
    \begin{tabular}{#2}

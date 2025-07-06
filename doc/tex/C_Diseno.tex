@@ -3,9 +3,295 @@
 \section{Introducción}
 
 \section{Diseño de datos}
+% Usar https://www.appdome.com/how-to/devsecops-automation-mobile-cicd/appdome-basics/structure-of-an-android-app-binary-apk como referencia
+% Explicación de la estructura de una APK. Explicar que es una especie de archivo comprimido basado en un jar. 
+% Usar una estructura similar y explicar cada una de las diferentes partes que puede tener,
+\dirtree{%
+	.1 /.
+	.2 assets.
+	.2 lib.
+	.3 arm64-v8a.
+	.3 x86.
+	.3 x86\_64.
+	.3 \dots{}.
+	.2  META-INF.
+	.3 CERT.SF (might have a different name).
+	.3 CERT.RSA (might have a different name).
+	.3 MANIFEST.MF.
+	.2 kotlin.
+	.2 res.
+	.2 AndroidManifest.xml.
+	.2 classes.dex.
+	.2 resources.arsc.
+}
+
+% Diseño de los datasets usados. Drebin y el dataset propio. Explicar en cada uno de ellos su formato y de dónde viene cada una de esas categorías. Basarse en el esquema y explicación anterior para no tener que detallar mucho el proceso de extracción. En esencia, para esta sección no es necesario entrar en detalle de cómo se extrae o realiza el proceso. Es únicamente para detallar estructuras de datos y diseño que se han usado.
+
+% Estructura de Drebin antes de tranformar:
+\dirtree{%
+	.1 drebin.
+	.2 apks.
+	.3 drebin\_0.zip.
+	.3 drebin\_1.zip.
+	.3 \dots{}.
+	.2 metadata.
+	.3 dataset\_splits.
+	.3 drebin\_results.
+	.3 feature\_vectors.
+	.4 000a067df9235ae\dots{}.
+	.4 \dots{}.
+	.3 drebin.libsvm.
+	.3 sha256\_family.csv.
+}
+
+% Estructura de Drebin tras transformar (mostrar fila de ejemplo de alguna forma):
+% sha256 | hw_features | req_permissions | app_components | intents | api_calls | used_permissions | urls | malware | family
+% 0002ab | android.hardware.tourchscreen, ... | android.permissions-READ_PHONE_STATE, ... | .GameBootReceiver,.GameService, ... | android.intent.action.BOOT_COMPLETED,android.intent.category.HOME, ... | android/content/Context;->startService,android/app/Activity;->startActivity, ... | android.permission.INTERNET,android.permission.VIBRATE, ... | Read/Write External Storage,getPackageInfo, ... | http://m-001.net/i/,m-001.net, ... | 1 | GinMaster
+
+% Estructura del dataset propio (mosrtar fila de ejemplo de alguna forma):
+% 	file_size	fuzzy_hash	activities_list	services_list	receivers_list	permissions_list	api_calls_list	opcode_counts	is_malware
+% 34234 | asdasdb | [android..., ...] | [] | ...
+
+% Explicar pipeline de preprocesado (externo) tokenizado, padding, escalado (interno) embedding
 
 \section{Diseño procedimental}
+% Diferentes diagramas de secuencia para la aplicación, explicar casos de uso principalmetne. Usar código mermaid para generar los diagramas.
 
 \section{Diseño arquitectónico}
 
+% diseño del modelo (capas) explicarlo
+%APKAnalysisModel( 
+%	(embedder): APKFeatureEmbedder( # Embedding dim configurable tambien; todos las caracteristicas usan la misma embedding dim
+%		(seq_embedders): ModuleDict( 
+%			(activities_list): Embedding(247562, 64, padding_idx=0)
+%			(services_list): Embedding(22045, 64, padding_idx=0)
+%			(receivers_list): Embedding(15922, 64, padding_idx=0)
+%			(permissions_list): Embedding(7781, 64, padding_idx=0)
+%			(api_calls_list): Embedding(3843329, 64, padding_idx=0)
+%		)
+%		(char_embedders): ModuleDict(
+%			(fuzzy_hash): Embedding(67, 32, padding_idx=0)
+%		)
+%		(char_gru): ModuleDict(
+%			(fuzzy_hash): GRU(32, 64, batch_first=True)
+%		)
+%		(vector_reducers): ModuleDict(
+%			(opcode_counts): Sequential(
+%				(0): Linear(in_features=768, out_features=128, bias=True)
+%				(1): ReLU()
+%				(2): Linear(in_features=128, out_features=64, bias=True)
+%				(3): ReLU()
+%			)
+%		)
+%	)
+%	(classifier): APKClassifier( 
+%		(mlp): Sequential(
+%			(0): Linear(in_features=449, out_features=64, bias=True)
+%			(1): ReLU()
+%			(2): Dropout(p=0.5, inplace=False)
+%			(3): Linear(in_features=64, out_features=2, bias=True) # Dinámico en función de un hiperparámetro hidden_dims. Tanto número de capas cópmo neurons
+%		)
+%	)
+%)
 
+% Diagrama del modelo
+
+% diseño de la app de streamlit, modelo cliente servidor
+
+
+%%%
+
+\apendice{C}{Especificación de Diseño}
+\label{apendice:diseno}
+
+\section{Introducción}
+Este apéndice presenta el diseño técnico detallado del sistema desarrollado. Su objetivo es servir como un plano que describe la arquitectura del software, la estructura de los datos con los que opera y la lógica procedimental de sus operaciones clave. Se abordará el diseño desde tres perspectivas: el diseño de datos, que define la estructura de los archivos APK y los \textit{datasets}; el diseño procedimental, que ilustra las interacciones principales mediante diagramas de secuencia; y el diseño arquitectónico, que desglosa la estructura interna del modelo de inteligencia artificial y de la aplicación web.
+
+%
+
+Este apéndice detalla el diseño técnico del sistema desarrollado, abarcando tres áreas fundamentales: el diseño de los datos, el diseño procedimental y el diseño arquitectónico. El objetivo es proporcionar una descripción clara y estructurada de cómo se ha organizado la información, cómo fluyen los procesos lógicos y cómo se ha construido la arquitectura del software, desde el modelo de inteligencia artificial hasta la aplicación web. Este documento sirve como un plano técnico que facilita la comprensión, el mantenimiento y la futura expansión del proyecto.
+
+\section{Diseño de datos}
+El diseño de datos es fundamental para cualquier sistema de aprendizaje automático. En esta sección se describe la estructura de los datos de entrada primarios (archivos APK) y los conjuntos de datos estructurados que se han derivado de ellos para el entrenamiento y la evaluación de los modelos.
+
+%
+
+El diseño de datos es fundamental para cualquier sistema de aprendizaje automático. En esta sección se describe la estructura de los datos de entrada (archivos APK), el formato de los \textit{datasets} utilizados durante el desarrollo y el \textit{pipeline} de preprocesamiento que los transforma para que puedan ser consumidos por los modelos.
+
+\subsection{Estructura de un archivo APK}
+Un archivo APK (\textit{Android Package Kit}) es el formato de paquete utilizado por el sistema operativo Android para la distribución e instalación de aplicaciones móviles. Aunque parece un único archivo, en realidad es un archivo comprimido (basado en el formato JAR y, por tanto, compatible con ZIP) que contiene un conjunto de ficheros y directorios con una estructura bien definida. La estructura de una APK es la siguiente:\\
+
+\dirtree{%
+	.1 /.
+	.2 assets.
+	.2 lib.
+	.3 arm64-v8a.
+	.3 x86.
+	.3 x86\_64.
+	.3 \dots{}.
+	.2 META-INF.
+	.3 CERT.SF.
+	.3 CERT.RSA.
+	.3 MANIFEST.MF.
+	.2 kotlin.
+	.2 res.
+	.2 AndroidManifest.xml.
+	.2 classes.dex.
+	.2 resources.arsc.
+}
+
+Los componentes más relevantes son:
+\begin{itemize}
+	\item \textbf{\texttt{assets/}}: Contiene recursos brutos que la aplicación puede utilizar, como ficheros de configuración, bases de datos o recursos de \textit{machine learning}.
+	
+	\item \textbf{\texttt{lib/}}: Como Android es multiplataforma, este directorio incluye el código compilado específico de las diferentes arquitecturas de procesador (ARM, \texttt{x86}). Contiene, a su vez, las librerías nativas de la aplicación.
+
+	\item \textbf{\texttt{META-INF/}}: Almacena los metadatos de la firma de la aplicación. Los ficheros \texttt{CERT.SF} y \texttt{CERT.RSA} contienen el certificado y la firma que garantizan la autenticidad e integridad de la aplicación, mientras que \texttt{MANIFEST.MF} contiene los \textit{hashes} de todos los ficheros del paquete.	
+
+	\item \textbf{kotlin:} Directorio que contiene el código fuente de Kotlin, si la aplicación está escrita en este lenguaje.
+	
+	\item \textbf{\texttt{res/}}: Contiene los recursos de la aplicación que no están compilados, como los diseños de la interfaz (\textit{layouts}), las imágenes (\textit{drawables}) o las cadenas de texto (\textit{strings}).
+	
+	\item \textbf{\texttt{AndroidManifest.xml}:} Es el archivo más importante del APK. Es un fichero XML obligatorio que describe la información esencial sobre la aplicación al sistema Android, como su nombre, componentes (actividades, servicios), permisos, versiones SDK mínima y objetivo.
+	
+	\item \textbf{\texttt{classes.dex}:} Contiene el código de la aplicación compilado en formato DEX (\textit{Dalvik Executable}), que es el que ejecuta la máquina virtual de Android (ART / Dalvik). Puede haber múltiples archivos .dex si la aplicación es grande.
+	
+	\item \textbf{\texttt{resources.arsc}:} Es un archivo que contiene recursos precompilados, como las cadenas de texto, para un acceso más eficiente por parte del sistema.
+\end{itemize}
+
+\subsection{Diseño de los conjuntos de datos}
+A lo largo del proyecto se han utilizado dos \textit{datasets} principales: el \textit{dataset} público Drebin para la fase de prototipado y un \textit{dataset} propio para el desarrollo del modelo final.
+
+\subsubsection{Dataset Drebin}
+El formato original del \textit{dataset} Drebin no era una tabla, sino una estructura de directorios compleja. Tras un proceso de \textit{parsing}, se transformó en un único archivo CSV con la siguiente estructura por fila:
+
+\begin{verbatim}
+	sha256 | req_permissions | app_components | ... | malware
+	000a06 | ["INTERNET", ...] | [".GameService", ...] | ... | 1
+\end{verbatim}
+
+Cada fila representa una aplicación, identificada por su \textit{hash} SHA256, y cada columna contiene una lista de las características estáticas extraídas de la misma.
+
+\subsubsection{Dataset propio}
+El \textit{dataset} final se construyó desde cero extrayendo características de 20.000 APKs obtenidas de AndroZoo. El formato resultante es un único fichero CSV donde cada fila corresponde a una aplicación. La estructura es la siguiente:
+\begin{verbatim}
+	file_size | fuzzy_hash     | activities_list   | ... | opcode_counts         | is_malware
+	34234     | "ab34...cd56"  | ["com.app...", ...] | ... | [221, 3455, 4567, ...] | 0
+\end{verbatim}
+
+\subsection{Pipeline de preprocesado de datos}
+Para que los datos de los \textit{datasets} puedan ser utilizados por los modelos, necesitan pasar primero por un \textit{pipeline} de preprocesamiento dividido en dos fases:
+
+\begin{enumerate}
+	\item \textbf{Procesamiento externo (offline):} Antes de iniciar cualquier entrenamiento, se realizan una serie de pasos sobre el \textit{dataset} completo. Para cada característica categórica (como los permisos o las actividades), se construye un \textbf{vocabulario} que asigna un índice numérico único a cada posible valor. Luego, todas las listas de cadenas de texto se convierten en listas de índices. Finalmente, se aplica un \textbf{padding} para que todas las listas de una misma columna tengan la misma longitud, convirtiéndolas en matrices numéricas.	
+	
+	\item \textbf{Procesamiento interno (online):} Una vez los datos están en formato de matrices de índices, el \textit{embedder} del modelo se encarga del resto. Durante el entrenamiento o la inferencia, aplica las capas de \textit{embedding} para convertir estos índices en vectores densos. Además, las características numéricas escalares (como el \texttt{file\_size}) son normalizadas internamente por el modelo para que sus rangos de valores no desestabilicen el entrenamiento.
+\end{enumerate}
+
+\section{Diseño procedimental}
+Para ilustrar el flujo de trabajo y las interacciones dentro del sistema, a continuación se presentan los diagramas de secuencia de los dos procesos más importantes: el análisis de un APK por parte de un usuario y el proceso interno de entrenamiento de un modelo.
+
+\subsubsection{Diagrama de secuencia: Análisis de un nuevo archivo APK}
+Este diagrama muestra la secuencia de interacciones desde que un usuario sube un archivo a la aplicación web hasta que recibe una predicción.
+
+%	sequenceDiagram
+%	actor Usuario
+%	participant AppWeb as Aplicación Web (Streamlit)
+%	participant Backend as Backend (Pipeline de IA)
+%	
+%	Usuario->>+AppWeb: Sube un archivo APK
+%	Usuario->>+AppWeb: Presiona el botón "Analizar"
+%	AppWeb->>+Backend: solicitaAnalisis(archivoAPK)
+%	Backend->>Backend: extraerCaracteristicas()
+%	Backend->>Backend: preprocesarDatos()
+%	Backend->>Backend: realizarInferencia()
+%	Backend-->>-AppWeb: devuelvePrediccion(resultado)
+%	AppWeb-->>-Usuario: Muestra los resultados en la interfaz
+
+\imagen{sequence_predict}{Diagrama de secuencia del proceso de analizar una APK.}
+
+\subsubsection{Diagrama de secuencia: Proceso de entrenamiento del modelo}
+Este diagrama detalla el bucle de entrenamiento de la red neuronal, un proceso iniciado por el desarrollador para ajustar los pesos del modelo.
+
+%	sequenceDiagram
+%	actor Desarrollador
+%	participant Script as Script de Entrenamiento
+%	participant DataLoader as Cargador de Datos
+%	participant Modelo as Red Neuronal (Embedder + Clasificador)
+%	participant Optimizador as Optimizador (Adam)
+%	
+%	Desarrollador->>+Script: Iniciar entrenamiento()
+%	loop Para cada Época
+%	Script->>+DataLoader: Solicitar lote de datos
+%	DataLoader-->>-Script: Entrega lote (datos, etiquetas)
+%	Script->>+Modelo: forward(datos)
+%	Modelo-->>-Script: Devuelve predicciones
+%	Script->>Script: calcularPerdida(predicciones, etiquetas)
+%	Script->>+Modelo: backward()
+%	Modelo-->>-Script: Calcula gradientes
+%	Script->>+Optimizador: step()
+%	Optimizador-->>-Modelo: Actualiza los pesos
+%	Script->>-DataLoader: (fin de lote)
+%	end
+%	Script-->>-Desarrollador: Entrenamiento finalizado
+
+\imagen{sequence_training}{Diagrama de secuencia del proceso de entrenamiento del modelo de red neuronal.}
+
+\section{Diseño arquitectónico}
+En esta sección se detalla la arquitectura tanto del modelo de inteligencia artificial como de la aplicación web de demostración.
+
+\subsection{Arquitectura del modelo}
+En esta sección se detalla la arquitectura del software, tanto del modelo de inteligencia artificial como de la aplicación web que lo utiliza.
+
+\subsection*{Arquitectura del modelo}
+El modelo de inteligencia artificial, implementado en PyTorch, sigue una arquitectura modular y flexible, compuesta por dos grandes bloques: el \textit{embedder} y el clasificador.
+
+\begin{verbatim}
+	APKAnalysisModel(
+			(embedder): APKFeatureEmbedder(
+			(seq_embedders): ModuleDict(...)
+			(char_embedders): ModuleDict(...)
+			(char_gru): ModuleDict(...)
+			(vector_reducers): ModuleDict(...)
+		)
+		(classifier): APKClassifier(
+			(mlp): Sequential(...)
+		)
+	)
+\end{verbatim}
+
+\begin{itemize}
+	\item \textbf{APKFeatureEmbedder (Embedder):} Es el componente más complejo y el corazón del sistema. Su única responsabilidad es recibir las características preprocesadas de un APK y convertirlas en un único vector numérico denso. Para ello, contiene diferentes submódulos especializados:
+	\begin{itemize}
+		\item \textbf{seq\_embedders:} Un diccionario de capas `Embedding` de PyTorch, una para cada característica de tipo lista (permisos, actividades, etc.). Cada capa aprende a representar los elementos de su vocabulario como un vector.
+		\item \textbf{char\_embedders y char\_gru:} Un módulo especializado para procesar el \texttt{FUZZY\_HASH}. Trata el \textit{hash} como una secuencia de caracteres, los convierte en vectores con un \textit{embedding} y luego los procesa con una capa GRU (Gated Recurrent Unit) para capturar patrones secuenciales.
+		\item \textbf{vector\_reducers:} Un diccionario de pequeñas redes neuronales (MLPs) que toman las características que ya son vectores numéricos (como \texttt{OPCODE\_COUNTS}) y reducen su dimensionalidad para que sea consistente con la de los otros \textit{embeddings}.
+	\end{itemize}
+	La salida de todos estos submódulos, junto con las características escalares, se concatena para formar el vector final.
+	
+	\item \textbf{APKClassifier (Clasificador):} Este componente es la cabeza del modelo. Por defecto, es una red neuronal de tipo Perceptrón Multicapa (MLP) que toma el vector del \textit{embedder} y, a través de una o más capas ocultas con funciones de activación ReLU y capas de \textit{dropout}, lo procesa para obtener la predicción final en sus dos neuronas de salida.
+\end{itemize}
+
+Una de las claves de este diseño es que la cabeza clasificadora es **intercambiable**. La salida del \textit{embedder} es un vector de características de alta calidad que puede ser utilizado para entrenar cualquier otro modelo de aprendizaje automático clásico (como RandomForest, XGBoost, SVM, etc.), tratando a la red neuronal simplemente como un potente paso de ingeniería de características.
+
+%\imagen{sequence_model_arch}{Diagrama de la arquitectura modelo de red neruonal.}
+
+\subsection{Arquitectura de la aplicación web}
+
+La aplicación de demostración se ha desarrollado con Streamlit y sigue una arquitectura cliente-servidor simple.
+
+\begin{itemize}
+	\item \textbf{Cliente:} Es el navegador web del usuario. Se encarga de renderizar la interfaz de usuario y de enviar las interacciones del usuario (como la subida de un archivo o el clic en un botón) al servidor.
+	
+	\item \textbf{Servidor:} Es el \textit{script} de Python de Streamlit que se ejecuta en el servidor. Este se encarga de toda la lógica de la aplicación: recibe las peticiones del cliente, carga los modelos de IA de los artefactos guardados, ejecuta el \textit{pipeline} de análisis sobre los datos recibidos y genera dinámicamente los componentes de la interfaz (tablas, gráficos, texto) que se envían de vuelta al cliente para ser mostrados.
+\end{itemize}
+
+%%
+
+\subsection*{Arquitectura de la aplicación web}
+La aplicación de demostración se ha desarrollado con Streamlit y sigue una arquitectura cliente-servidor simple.
+\begin{itemize}
+	\item \textbf{Cliente (Navegador Web):} El usuario interactúa con la interfaz de la aplicación, que se renderiza en su navegador. Esta interfaz está compuesta por los componentes que ofrece Streamlit (botones, selectores, pestañas, etc.).
+	\item \textbf{Servidor (Script de Python):} Un único \textit{script} de Python se ejecuta en el servidor. Este \textit{script} contiene toda la lógica de la aplicación. Se encarga de cargar los modelos entrenados en memoria al iniciarse, gestionar las interacciones del usuario (como la subida de archivos), llamar al \textit{pipeline} de análisis para obtener las predicciones y generar los gráficos de interpretabilidad. Cuando el cliente realiza una acción, el servidor la procesa y le devuelve los nuevos elementos visuales para que la interfaz se actualice.
+\end{itemize}
+Este diseño permite un desarrollo muy rápido y una integración perfecta con todo el código de análisis y modelado desarrollado en Python.

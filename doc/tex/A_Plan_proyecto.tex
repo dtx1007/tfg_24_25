@@ -2,12 +2,162 @@
 
 \section{Introducción}
 
+Este apéndice detalla los aspectos de gestión y planificación que han guiado el desarrollo de este Trabajo de Fin de Grado. Se presentará la planificación temporal seguida del estudio de viabilidad económica que estima los costes asociados al proyecto y, finalmente, un análisis de la viabilidad legal en base a las licencias del \textit{software} empleado para determinar la licencia más adecuada para el producto final.
+
 \section{Planificación temporal}
+
+Para la gestión de este proyecto se ha adoptado un marco de trabajo inspirado en las metodologías ágiles, concretamente en SCRUM. La filosofía ágil, articulada en el Manifiesto Ágil~\cite{beck2001manifesto}, aboga por la colaboración, la flexibilidad ante los cambios y la entrega de valor de forma incremental, en contraposición a los modelos de desarrollo en cascada tradicionales. Aunque SCRUM está diseñado principalmente para la gestión de equipos, sus principios de organización en iteraciones o \textit{sprints}, la revisión continua y la adaptación han sido muy útiles para estructurar el trabajo individual. En este caso, se ha seguido una versión <<ligera>> de SCRUM, con \textit{sprints} de cuatro semanas, marcados por reuniones periódicas con el tutor para revisar los avances, resolver dudas y planificar los siguientes pasos. Para la gestión del tiempo diario, se han empleado técnicas de productividad como el método Pomodoro (usando aplicaciones como Forest~\cite{forestappForestStay}), alternando bloques de trabajo intenso con descansos para mantener la concentración y evitar la fatiga.
+
+A continuación, se detalla el cronograma del proyecto, dividido en los diferentes \textit{sprints} realizados:
+
+\subsection{Sprint 1 (2 semanas: 2 diciembre - 15 diciembre)}
+
+Este fue el \textit{sprint} inicial y más corto del proyecto, diseñado para asentar las bases y explorar las posibles líneas de investigación. El objetivo era encontrar un tema que combinara tanto el campo de la ciberseguridad como el de la inteligencia artificial. La primera idea que se exploró fue la de utilizar IA para mitigar vulnerabilidades de \textit{hardware}, concretamente, ataques de ejecución especulativa (Spectre y Meltdown). Sin embargo, tras investigar acerca de ello en la literatura, se concluyó que era un campo extremadamente complejo y con muy poca documentación accesible, por lo que se descartó por su alta incertidumbre.
+
+La investigación continuó pues hacia el análisis de \textit{malware}. Como primer concepto, se consideró la idea de crear un analizador dinámico, una especie de \textit{sandbox} donde ejecutar aplicaciones de forma aislada para estudiar su comportamiento en tiempo real. Aunque este enfoque contaba con más documentación, se determinó que la complejidad de desarrollar un entorno de este tipo desde cero era demasiado ambiciosa para el alcance del trabajo. Este \textit{sprint} fue el más breve y acabó antes de tiempo debido, principalmente a su proximidad con los exámenes finales y a las vacaciones de Navidad.
+
+\subsection{Sprint 2 (4 semanas: 20 enero - 16 febrero)}
+
+Tras las vacaciones, se retomó la investigación centrándose en el análisis de \textit{malware}, pero esta vez explorando otras técnicas como el análisis estático y el híbrido. El análisis estático destacó inmediatamente por su principal ventaja: la capacidad de detectar \textit{malware} sin ejecutarlo. La literatura confirmó que la combinación de análisis estático y modelos de aprendizaje profundo \textit{deep learning} era un campo de investigación muy activo y con resultados prometedores.
+
+Con esta idea clara, se procedió a elegir la plataforma. Se descartaron los ejecutables de Windows (PE) y Linux (ELF) por la dificultad de analizar código máquina compilado. La elección final fue el formato APK de Android, ya que su estructura, similar a un archivo comprimido, y su código Dalvik, fácilmente descompilable, simplificaban enormemente la extracción de características. Durante este \textit{sprint} se encontraron los \textit{papers} fundamentales que servirían de guía para el resto del proyecto, especialmente el trabajo de İbrahim et al.~\cite{9936621}, que se convirtió en la principal referencia de este.
+
+\subsection{Sprint 3 (4 semanas: 17 febrero - 16 marzo)}
+
+Con el rumbo del proyecto ya definido, este \textit{sprint} se centró en comenzar la fase de prototipado. El primer paso fue buscar un \textit{dataset} adecuado para las pruebas iniciales. Tras evaluar varias opciones, se seleccionó el \textit{dataset} Drebin~\cite{arp2014drebin} por su gran tamaño y la similitud de sus características con las descritas en el \textit{paper} de referencia. Se dedicó una parte importante del tiempo a desarrollar los \textit{scripts} necesarios para procesar el formato particular de Drebin y convertirlo en un archivo CSV manejable. Paralelamente, se comenzó a redactar la memoria del proyecto, documentando los primeros conceptos teóricos de ciberseguridad, y se integró la herramienta Poetry para facilitar con la gestión de dependencias.
+
+\subsection{Sprint 4 (4 semanas: 17 marzo - 13 abril)}
+
+Este \textit{sprint} fue de carácter principalmente teórico y de diseño. A medida que avanzaba la investigación sobre cómo construir una red neuronal desde cero, se fue ampliando la sección de conceptos de la memoria con las definiciones de IA, aprendizaje automático, preprocesamiento de datos, etc. Se estudió en profundidad el funcionamiento de las redes neuronales, las funciones de pérdida, los optimizadores y las arquitecturas de \textit{embedding}. El objetivo era adquirir toda la base teórica necesaria antes de empezar a escribir el código del modelo prototipo.
+
+\subsection{Sprint 5 (4 semanas: 14 abril - 11 mayo)}
+
+Durante este \textit{sprint} se desarrolló la primera versión del modelo de red neuronal en PyTorch, basado en el \textit{dataset} Drebin. Durante este proceso surgió el dilema del \textit{embedder}: se tomó la decisión clave de separar la arquitectura en un \textit{embedder} (preprocesador) y una cabeza clasificadora (MLP) para poder comparar el modelo con algoritmos clásicos de ML. Se implementó el proceso de entrenamiento para la red neuronal y para los modelos clásicos, se unificó el sistema de guardado y carga de modelos, y se generaron las primeras gráficas y estadísticas de rendimiento, que validaron la viabilidad del enfoque.
+
+\subsection{Sprint 6 (4 semanas: 12 mayo - 8 junio)}
+
+Con el prototipo validado, este \textit{sprint} se dedicó a refinar el código y a preparar la transición hacia el modelo final. Se refactorizó la implementación actual del modelo para separarlo en componentes más modulares y fáciles de mantener y modificar. El proceso de entrenamiento se mejoró para incluir la estratificación de los datos y tener en cuenta el desbalance de clases. Al mismo tiempo, comenzó la creación del \textit{dataset} propio, se realizaron pruebas con Androguard para la extracción de características y se descubrió el repositorio AndroZoo~\cite{Allix:2016:ACM:2901739.2903508}, con el que se experimentó para automatizar la descarga de APKs. Finalmente, se desarrolló el \textit{pipeline} completo para la creación del nuevo \textit{dataset} y se adaptó el código del modelo para que fuera compatible con el.
+
+\subsection{Sprint 7 (4 semanas: 9 junio - 6 julio)}
+
+Este fue el \textit{sprint} final y más intenso. La adaptación del modelo al nuevo y mucho más complejo \textit{dataset} reveló graves problemas de rendimiento y diseño que habían pasado desapercibidos. Se dedicó un gran esfuerzo a la depuración y optimización del modelo, solucionando problemas de gestión de memoria, cuellos de botella en el procesamiento de datos y la inhabilidad del modelo para entrenar. Una vez solucionados, se reentrenó el modelo final y se realizó el análisis de resultados comparativo y de interpretabilidad. Paralelamente, se desarrolló la aplicación web de demostración con Streamlit, se creó el repositorio de despliegue con Docker y se desplegó la aplicación en un servidor de la universidad. Finalmente, se terminó de redactar toda la documentación del proyecto; la memoria y sus anexos.
 
 \section{Estudio de viabilidad}
 
+En este apartado se realiza un análisis de la viabilidad del proyecto desde dos perspectivas: la económica, estimando los costes asociados a su desarrollo, y la legal, estudiando las licencias del software utilizado para determinar la licencia más apropiada para el trabajo resultante.
+
 \subsection{Viabilidad económica}
+
+A continuación, se calcularán los costes teóricos asociados al desarrollo de este proyecto, considerando un escenario profesional hipotético en el que se contratara a personal y se adquirieran los recursos necesarios. Se desglosarán los costes en personales, de hardware, de software e indirectos.
+
+\subsubsection{Costes de personal}
+
+Son los costes asociados al salario de las personas que han trabajado en el proyecto. Se estima una dedicación de unas 650 horas a lo largo de 6 meses, lo que equivale a unas 28 horas semanales. Tomando como referencia el salario medio de un ingeniero júnior en España (aproximadamente $1\,930$\,€ brutos/mes por 40 horas semanales), el salario proporcional sería:
+
+\[\frac{28 \text{ h/semana}}{40 \text{ h/semana}} \times 1\,930 \text{\,€/mes} = 1\,351 \text{\,€/mes}\]
+
+A este salario hay que sumarle las cotizaciones a la Seguridad Social a cargo de la empresa. Según las bases de cotización vigentes~\cite{segSocial2025}, los tipos aplicables para contingencias comunes y profesionales suman aproximadamente un $29.9$\% ($23.6$\% por contingencias comunes, $5.5$\% por desempleo, $0.2$\% FOGASA y $0.6$\% por formación profesional). Por tanto, el coste total del desarrollador para la empresa durante los 6 meses sería:
+
+\[1\,351 \text{\,€} \times (1 + 0.299) \times 6 \text{ meses} = 10\,529.71 \text{\,€}\]
+
+Adicionalmente, se estima el coste del tutor del proyecto, con una dedicación de 1 hora semanal (4 horas/mes) y una tarifa supuesta de 30\,€/hora.
+
+\[(30 \text{\,€/h} \times 4 \text{ h/mes}) \times (1 + 0.299) \times 6 \text{ meses} = 935.28 \text{\,€}\]
+
+Por tanto, el coste total en personal es de $11\,464.99$\,€.
+
+\subsubsection{Costes de \textit{hardware} (materiales)}
+
+El proyecto se desarrolló en un ordenador personal valorado en 1\,600\,€. Suponiendo una vida útil de 8 años, el coste de amortización para los 6 meses de proyecto es:
+
+\[\frac{1\,600 \text{\,€}}{8 \text{ años}} \times \frac{6 \text{ meses}}{12 \text{ meses/año}} = 100 \text{\,€}\]
+
+Además, para el entrenamiento del modelo se podría haber utilizado un servicio de \textit{cloud computing}. Una estimación para una instancia pequeña durante un supuesto de 150 horas de trabajo en Google Cloud Platform sería de aproximadamente $108.65$\,€. Por lo cual, el coste total de \textit{hardware} sería de $208.65$\,€.
+
+\subsubsection{Costes de \textit{software}}
+
+Todo el \textit{software} empleado en el desarrollo del proyecto es de código abierto y gratuito, con la única posible excepción del sistema operativo. Asumiendo el uso de una licencia de Windows 11 Home, los costes por \textit{software} serían de 145\,€.
+
+\subsubsection{Costes indirectos}
+
+Estos costes incluyen los suministros necesarios para el desarrollo. Suponiendo un consumo eléctrico medio de 50 kWh/mes a un precio de $0.1702$\,€/kWh y un coste de conexión a \textit{internet} de 30\,€/mes, los costes indirectos para los 6 meses de proyecto serían de $231.06$\,€:
+
+\[(50 \text{ kWh/mes} \times 0.1702 \text{\,€/kWh} \times 6 \text{ meses}) +\]
+\[(30 \text{\,€/mes} \times 6 \text{ meses}) = 51.06 \text{\,€} + 180 \text{\,€} = 231.06 \text{\,€}\]
+
+\subsubsection{Coste total del proyecto}
+
+La suma de todas los costes anteriores nos da una estimación del coste total teórico del proyecto.
+
+\tablaSmall{Resumen de los costes totales del proyecto.}{l r}{tab:costes_totales}
+{\textbf{Concepto} & \textbf{Coste Estimado} \\}
+{
+	Costes de personal & $11\,464.99$\,€ \\
+	Costes de hardware & $208.65$\,€ \\
+	Coste de software & $145.00$\,€ \\
+	Costes indirectos & $231.06$\,€ \\
+	\textbf{Coste total} & \textbf{$12\,049.70$\,€} \\
+}
+
+Dado que el proyecto es de carácter puramente académico y de investigación, no se contempla la posibilidad de comercializarlo, por lo cual, no se calculan los posibles beneficios de este.
 
 \subsection{Viabilidad legal}
 
+Este apartado analiza las licencias del software utilizado para determinar bajo qué licencia puede ser distribuido este proyecto, garantizando el cumplimiento de todos los términos legales.
 
+\subsubsection{Tipos de licencias \textit{Open Source}}
+
+Existen numerosas licencias de código abierto, cada una con diferentes permisos y obligaciones. La siguiente tabla resume algunas de las más comunes.
+
+\begin{table}[h!]
+	\centering
+	\begin{adjustbox}{max width=\textwidth}
+		\renewcommand{\arraystretch}{1.15}
+		\begin{tabular}{|l|c|c|c|c|c|c|}
+			\hline
+			& MIT & BSD-2 & BSD-3 & Apache 2.0 & LGPL-2.1 & GPL-3.0 \\ \hline \hline
+			\multicolumn{7}{|l|}{\textbf{Permisos}} \\ \hline
+			Uso comercial                & x & x & x & x & x & x \\ \hline
+			Modificación                 & x & x & x & x & x & x \\ \hline
+			Distribución                 & x & x & x & x & x & x \\ \hline
+			Uso privado                  & x & x & x & x & x & x \\ \hline
+			Patentes concedidas          &   &   &   & x &   & (implícitas) \\ \hline \hline
+			\multicolumn{7}{|l|}{\textbf{Condiciones}} \\ \hline
+			Conservar aviso/licencia     & x & x & x & x & x & x \\ \hline
+			Indicar cambios              &   &   &   & x & x & x \\ \hline
+			Publicar código derivado     &   &   &   &   & (solo lib) & x \\ \hline
+			Misma licencia en derivado   &   &   &   &   & (solo lib) & x \\ \hline
+			No uso del nombre/marca      &   &   & x & x* &   &   \\ \hline \hline
+			\multicolumn{7}{|l|}{\textbf{Limitaciones}} \\ \hline
+			Sin garantía                 & x & x & x & x & x & x \\ \hline
+			Sin responsabilidad          & x & x & x & x & x & x \\ \hline
+		\end{tabular}
+	\end{adjustbox}
+	\caption{Características de licencias \textit{open source}. *Solo marcas registradas.}
+	\label{tab:licencias_matriz}
+\end{table}
+
+\subsubsection{Licencias del software empleado}
+
+La gran mayoría de las herramientas y librerías utilizadas en este proyecto se distribuyen bajo licencias de código abierto muy permisivas.
+
+\tablaSmall{Licencias del software usado en el proyecto}{p{.4\textwidth} p{.5\textwidth}}{project_tools_licenses}
+{\textbf{Software / Herramienta} & \textbf{Licencia} \\}
+{
+	Python & PSF License (similar a BSD) \\
+	Poetry, Optuna, SHAP & MIT License \\
+	Conda, Jupyter, PyTorch, Scikit-learn, NumPy, Pandas, UMAP & BSD 3-Clause License (o similar) \\
+	Matplotlib & PSF/BSD-style License \\
+	Streamlit, Docker & Apache License 2.0 \\
+	Androguard & GNU Lesser General Public License v2.1 (LGPLv2.1) \\
+}
+
+\subsubsection{Elección de la licencia del proyecto}
+
+Como se muestra en la tabla \ref{tabla:project_tools_licenses}, la mayoría de las dependencias utilizan licencias permisivas como MIT, BSD y Apache 2.0, que permiten el uso, modificación y distribución del software con muy pocas restricciones. El único caso especial es Androguard, licenciado bajo LGPLv2.1. Esta licencia exige que si se modifica el código fuente de la librería, dichas modificaciones deben publicarse bajo la misma licencia. Sin embargo, como este proyecto utiliza Androguard como una librería externa, sin modificar su código, no estamos obligados a aplicar la licencia LGPL a nuestro propio código.
+
+Dada la naturaleza permisiva de las licencias de las dependencias, la opción más adecuada para este proyecto es una licencia igualmente permisiva. Por tanto, se ha decidido licenciar este trabajo bajo la licencia MIT, ya que maximiza la libertad de uso y es compatible con el resto del ecosistema de herramientas.
+
+\subsubsection{Legalidad del análisis de aplicaciones}
+
+Un punto importante a considerar es la legalidad de desensamblar y analizar archivos APK. La legislación europea, concretamente la Directiva 2009/24/CE sobre la protección jurídica de los programas de ordenador~\cite{europea2009directiva}, contempla excepciones al derecho exclusivo del autor. El artículo 6 permite la descompilación cuando sea indispensable para obtener la información necesaria para lograr la interoperabilidad de un programa creado de forma independiente. Aunque el fin de este proyecto es la seguridad, el principio es análogo: se analiza la aplicación para entender su funcionamiento e interoperabilidad con el sistema operativo con fines de investigación y defensa. Es crucial destacar que este proyecto no modifica ni redistribuye ninguna de las aplicaciones analizadas; únicamente extrae características de ellas para su estudio, una práctica ampliamente aceptada y considerada legitima.
