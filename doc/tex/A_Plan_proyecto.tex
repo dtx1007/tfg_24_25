@@ -56,23 +56,23 @@ Son los costes asociados al salario de las personas que han trabajado en el proy
 
 \[\frac{28 \text{ h/semana}}{40 \text{ h/semana}} \times 1\,930 \text{\,€/mes} = 1\,351 \text{\,€/mes}\]
 
-A este salario hay que sumarle las cotizaciones a la Seguridad Social a cargo de la empresa. Según las bases de cotización vigentes~\cite{segSocial2025}, los tipos aplicables para contingencias comunes y profesionales suman aproximadamente un $29.9$\% ($23.6$\% por contingencias comunes, $5.5$\% por desempleo, $0.2$\% FOGASA y $0.6$\% por formación profesional). Por tanto, el coste total del desarrollador para la empresa durante los 6 meses sería:
+A este salario hay que sumarle las cotizaciones a la Seguridad Social a cargo de la empresa. Según las bases de cotización vigentes~\cite{segSocial2025}, los tipos aplicables para contingencias comunes y profesionales suman aproximadamente un $30.57$\% ($23.6$\% por contingencias comunes, $5.5$\% por desempleo, $0.2$\% FOGASA (FOndo de GArantía SAlarial),  $0.6$\% por formación profesional y $0.67$ por MEI (Mecanismo de Equidad Intergeneracional)). Por tanto, el coste total del desarrollador para la empresa durante los 6 meses sería:
 
-\[1\,351 \text{\,€} \times (1 + 0.299) \times 6 \text{ meses} = 10\,529.71 \text{\,€}\]
+\[1\,351 \text{\,€} \times (1 + 0.3057) \times 6 \text{ meses} = 10\,584 \text{\,€}\]
 
 Adicionalmente, se estima el coste del tutor del proyecto, con una dedicación de 1 hora semanal (4 horas/mes) y una tarifa supuesta de 30\,€/hora.
 
-\[(30 \text{\,€/h} \times 4 \text{ h/mes}) \times (1 + 0.299) \times 6 \text{ meses} = 935.28 \text{\,€}\]
+\[(30 \text{\,€/h} \times 4 \text{ h/mes}) \times (1 + 0.3057) \times 6 \text{ meses} = 940.10 \text{\,€}\]
 
-Por tanto, el coste total en personal es de $11\,464.99$\,€.
+Por tanto, el coste total en personal es de $11\,524.10$\,€.
 
 \subsubsection{Costes de \textit{hardware} (materiales)}
 
-El proyecto se desarrolló en un ordenador personal valorado en 1\,600\,€. Suponiendo una vida útil de 8 años, el coste de amortización para los 6 meses de proyecto es:
+El proyecto se desarrolló en un ordenador personal valorado en 1\,600\,€. Suponiendo una vida útil de 5 años, el coste de amortización para los 6 meses de proyecto es:
 
-\[\frac{1\,600 \text{\,€}}{8 \text{ años}} \times \frac{6 \text{ meses}}{12 \text{ meses/año}} = 100 \text{\,€}\]
+\[\frac{1\,600 \text{\,€}}{5 \text{ años}} \times \frac{6 \text{ meses}}{12 \text{ meses/año}} = 160 \text{\,€}\]
 
-Además, para el entrenamiento del modelo se podría haber utilizado un servicio de \textit{cloud computing}. Una estimación para una instancia pequeña durante un supuesto de 150 horas de trabajo en Google Cloud Platform sería de aproximadamente $108.65$\,€. Por lo cual, el coste total de \textit{hardware} sería de $208.65$\,€.
+Además, para el entrenamiento del modelo se podría haber utilizado un servicio de \textit{cloud computing}. Una estimación para una instancia pequeña durante un supuesto de 150 horas de trabajo en Google Cloud Platform sería de aproximadamente $108.65$\,€. Por lo cual, el coste total de \textit{hardware} sería de $268.65$\,€.
 
 \subsubsection{Costes de \textit{software}}
 
@@ -92,11 +92,11 @@ La suma de todas los costes anteriores nos da una estimación del coste total te
 \tablaSmall{Resumen de los costes totales del proyecto.}{l r}{tab:costes_totales}
 {\textbf{Concepto} & \textbf{Coste Estimado} \\}
 {
-	Costes de personal & $11\,464.99$\,€ \\
-	Costes de hardware & $208.65$\,€ \\
+	Costes de personal & $11\,524.10$\,€ \\
+	Costes de hardware & $268.65$\,€ \\
 	Coste de software & $145.00$\,€ \\
 	Costes indirectos & $231.06$\,€ \\
-	\textbf{Coste total} & \textbf{$12\,049.70$\,€} \\
+	\textbf{Coste total} & \textbf{$12\,168.81$\,€} \\
 }
 
 Dado que el proyecto es de carácter puramente académico y de investigación, no se contempla la posibilidad de comercializarlo, por lo cual, no se calculan los posibles beneficios de este.
@@ -117,20 +117,20 @@ Existen numerosas licencias de código abierto, cada una con diferentes permisos
 			\hline
 			& MIT & BSD-2 & BSD-3 & Apache 2.0 & LGPL-2.1 & GPL-3.0 \\ \hline \hline
 			\multicolumn{7}{|l|}{\textbf{Permisos}} \\ \hline
-			Uso comercial                & x & x & x & x & x & x \\ \hline
-			Modificación                 & x & x & x & x & x & x \\ \hline
-			Distribución                 & x & x & x & x & x & x \\ \hline
-			Uso privado                  & x & x & x & x & x & x \\ \hline
-			Patentes concedidas          &   &   &   & x &   & (implícitas) \\ \hline \hline
+			Uso comercial                & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Modificación                 & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Distribución                 & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Uso privado                  & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Patentes concedidas          &   &   &   & \ytick &   & (implícitas) \\ \hline \hline
 			\multicolumn{7}{|l|}{\textbf{Condiciones}} \\ \hline
-			Conservar aviso/licencia     & x & x & x & x & x & x \\ \hline
-			Indicar cambios              &   &   &   & x & x & x \\ \hline
-			Publicar código derivado     &   &   &   &   & (solo lib) & x \\ \hline
-			Misma licencia en derivado   &   &   &   &   & (solo lib) & x \\ \hline
-			No uso del nombre/marca      &   &   & x & x* &   &   \\ \hline \hline
+			Conservar aviso/licencia     & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Indicar cambios              &   &   &   & \ytick & \ytick & \ytick \\ \hline
+			Publicar código derivado     &   &   &   &   & (solo lib) & \ytick \\ \hline
+			Misma licencia en derivado   &   &   &   &   & (solo lib) & \ytick \\ \hline
+			No uso del nombre/marca      &   &   & \ytick & \ytick* &   &   \\ \hline \hline
 			\multicolumn{7}{|l|}{\textbf{Limitaciones}} \\ \hline
-			Sin garantía                 & x & x & x & x & x & x \\ \hline
-			Sin responsabilidad          & x & x & x & x & x & x \\ \hline
+			Sin garantía                 & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
+			Sin responsabilidad          & \ytick & \ytick & \ytick & \ytick & \ytick & \ytick \\ \hline
 		\end{tabular}
 	\end{adjustbox}
 	\caption{Características de licencias \textit{open source}. *Solo marcas registradas.}

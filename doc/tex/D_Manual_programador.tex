@@ -11,13 +11,18 @@ A continuación se muestra y explica la estructura de directorios del repositori
 	.1 /.
 	.2 apks/\\
 	{	
-		\vspace*{0.5em}%
 		\hspace*{1em}%
 		\begin{minipage}[t]{0.85\textwidth}
 			\normalfont
 			Directorio destinado a contener los archivos APK en bruto descargados para la creación del \textit{dataset}. También almacena el catálogo de AndroZoo (\texttt{latest.csv}). Por su gran tamaño, el contenido de este directorio no se incluye en el repositorio de Git.
 		\end{minipage}
 	}.
+}
+
+\newpage
+
+\dirtree{%
+	.1 /.
 	.2 dataset/\\
 	{	
 		\vspace*{0.5em}%
@@ -86,19 +91,22 @@ Contiene todo el código de la aplicación web interactiva desarrollada con Stre
 }
 
 \begin{itemize}
-	\item \textbf{malware\_interpreter\_app.py:} Es el punto de entrada de la aplicación web. Inicializa y controla la interfaz de usuario, gestiona el estado de la sesión (como el historial) y coordina las llamadas al resto de módulos para realizar el análisis cuando un usuario sube un APK.
+	\item \textbf{\texttt{malware\_interpreter\_app.py}:} Es el punto de entrada de la aplicación web. Inicializa y controla la interfaz de usuario, gestiona el estado de la sesión (como el historial) y coordina las llamadas al resto de módulos para realizar el análisis cuando un usuario sube un APK.
 	
-	\item \textbf{model\_utils.py:} Encapsula la lógica de carga y uso de los modelos de IA. Contiene funciones para cargar los modelos (tanto para la red neuronal como para los modelos clásicos) desde disco usando un sistema de caché para optimizar el rendimiento, y para ejecutar las predicciones.
+	\item \textbf{\texttt{model\_utils.py}:} Encapsula la lógica de carga y uso de los modelos de IA. Contiene funciones para cargar los modelos (tanto para la red neuronal como para los modelos clásicos) desde disco usando un sistema de caché para optimizar el rendimiento, y para ejecutar las predicciones.
 	
-	\item \textbf{data\_utils.py:} Gestiona la carga de datos auxiliares necesarios para la aplicación, como el \textit{dataset} de fondo que utiliza SHAP para sus explicaciones.
+	\item \textbf{\texttt{data\_utils.py}:} Gestiona la carga de datos auxiliares necesarios para la aplicación, como el \textit{dataset} de fondo que utiliza SHAP para sus explicaciones.
 	
-	\item \textbf{shap\_utils.py:} Centraliza la lógica de interpretabilidad. Contiene las funciones para crear el <<explicador>> de SHAP y para calcular los valores de importancia de las características para una predicción concreta.
+	\item \textbf{\texttt{shap\_utils.py}:} Centraliza la lógica de interpretabilidad. Contiene las funciones para crear el <<explicador>> de SHAP y para calcular los valores de importancia de las características para una predicción concreta.
 	
-	\item \textbf{ui\_utils.py:} Módulo con funciones de ayuda para generar componentes visuales específicos, como los gráficos de SHAP o la proyección UMAP.
+	\item \textbf{\texttt{ui\_utils.py}:} Módulo con funciones de ayuda para generar componentes visuales específicos, como los gráficos de SHAP o la proyección UMAP.
 \end{itemize}
 
 \subsubsection{Directorio \texttt{src/notebooks}}
 Contiene los Jupyter Notebooks, que sirven a modo de <<campo de pruebas>> para el proyecto, se utilizan para la experimentación, el prototipado y el análisis de datos.
+
+\newpage
+
 \dirtree{%
 	.1 notebooks/.
 	.2 download\_apks.ipynb.
@@ -111,19 +119,19 @@ Contiene los Jupyter Notebooks, que sirven a modo de <<campo de pruebas>> para e
 }
 
 \begin{itemize}
-	\item \textbf{download\_apks.ipynb:} Contiene el código para descargar los archivos APK desde AndroZoo, utilizando su catálogo para filtrar y seleccionar las muestras.
+	\item \textbf{\texttt{download\_apks.ipynb}:} Contiene el código para descargar los archivos APK desde AndroZoo, utilizando su catálogo para filtrar y seleccionar las muestras.
 	
-	\item \textbf{androguard\_feature\_extraction.ipynb:} Es uno de los cuadernos más importantes. Implementa el \textit{pipeline} que toma los APKs descargados, los analiza con Androguard para extraer sus características estáticas y crea con ellas el \textit{dataset} final.
+	\item \textbf{\texttt{androguard\_feature\_extraction.ipynb}:} Es uno de los cuadernos más importantes. Implementa el \textit{pipeline} que toma los APKs descargados, los analiza con Androguard para extraer sus características estáticas y crea con ellas el \textit{dataset} final.
 	
-	\item \textbf{models\_training.ipynb:} Contiene toda la lógica para entrenar y evaluar tanto la red neuronal como los modelos clásicos, utilizando la validación cruzada. Al finalizar, guarda los modelos y artefactos en disco.
+	\item \textbf{\texttt{models\_training.ipynb}:} Contiene toda la lógica para entrenar y evaluar tanto la red neuronal como los modelos clásicos, utilizando la validación cruzada. Al finalizar, guarda los modelos y artefactos en disco.
 	
-	\item \textbf{model\_intrepretability.ipynb:} Se centra en la interpretabilidad. Carga los modelos ya entrenados y utiliza SHAP para generar los datos necesarios para las visualizaciones de diferentes gráficos como el de importancia de características, gráficos de fuerza, gráficos en cascada, etc.
+	\item \textbf{\texttt{model\_intrepretability.ipynb}:} Se centra en la interpretabilidad. Carga los modelos ya entrenados y utiliza SHAP para generar los datos necesarios para las visualizaciones de diferentes gráficos como el de importancia de características, gráficos de fuerza, gráficos en cascada, etc.
 	
-	\item \textbf{models\_stats.ipynb:} Permite obtener una vista general del rendimiento de los modelos entrenados. Carga las métricas de todos los modelos entrenados y genera varios gráficos comparativos (boxplots, curvas ROC/PR, etc.).
+	\item \textbf{\texttt{models\_stats.ipynb}:} Permite obtener una vista general del rendimiento de los modelos entrenados. Carga las métricas de todos los modelos entrenados y genera varios gráficos comparativos (boxplots, curvas ROC/PR, etc.).
 	
-	\item \textbf{quantize\_model.ipynb:} Cuaderno de pruebas para aplicar técnicas de cuantización al modelo de red neuronal y evaluar su impacto en el tamaño y el rendimiento.
+	\item \textbf{\texttt{quantize\_model.ipynb}:} Cuaderno de pruebas para aplicar técnicas de cuantización al modelo de red neuronal y evaluar su impacto en el tamaño y el rendimiento.
 	
-	\item \textbf{hyperparameters\_optimization.ipynb:} Implementa el proceso de búsqueda de hiperparámetros óptimos utilizando la librería Optuna.
+	\item \textbf{\texttt{hyperparameters\_optimization.ipynb}:} Implementa el proceso de búsqueda de hiperparámetros óptimos utilizando la librería Optuna.
 \end{itemize}
 
 \subsubsection{Directorio \texttt{src/prototypes}}
@@ -136,13 +144,13 @@ Este es el directorio más importante a nivel de código fuente. Contiene los m�
 	.2 ml\_model\_io.py.
 }
 \begin{itemize}
-	\item \textbf{torch\_apk\_analysis\_model.py:} Define la arquitectura completa de la red neuronal en PyTorch, incluyendo las clases para el \texttt{APKFeatureEmbedder}, el \texttt{APKClassifier} y el modelo principal que los une. También contiene las funciones para el bucle de entrenamiento, la evaluación y la inferencia.
+	\item \textbf{\texttt{torch\_apk\_analysis\_model.py}:} Define la arquitectura completa de la red neuronal en PyTorch, incluyendo las clases para el \texttt{APKFeatureEmbedder}, el \texttt{APKClassifier} y el modelo principal que los une. También contiene las funciones para el bucle de entrenamiento, la evaluación y la inferencia.
 	
-	\item \textbf{torch\_apk\_analysis\_model\_io.py:} Gestiona el guardado y la carga del modelo de red neuronal y todos sus metadatos asociados (vocabularios, <<escaladores>>, etc.).
+	\item \textbf{\texttt{torch\_apk\_analysis\_model\_io.py}:} Gestiona el guardado y la carga del modelo de red neuronal y todos sus metadatos asociados (vocabularios, <<escaladores>>, etc.).
 	
-	\item \textbf{ml\_model.py:} Define y entrena los modelos de aprendizaje automático clásicos (RandomForest, XGBoost, etc.) utilizando la librería scikit-learn.
+	\item \textbf{\texttt{ml\_model.py}:} Define y entrena los modelos de aprendizaje automático clásicos (RandomForest, XGBoost, etc.) utilizando la librería scikit-learn.
 	
-	\item \textbf{ml\_model\_io.py:} Se encarga de guardar y cargar los modelos clásicos ya entrenados.
+	\item \textbf{\texttt{ml\_model\_io.py}:} Se encarga de guardar y cargar los modelos clásicos ya entrenados.
 \end{itemize}
 
 \subsubsection{Directorio \texttt{src/utils}}
@@ -154,15 +162,15 @@ Contiene \textit{scripts} con funciones de utilidad que dan soporte al resto del
 	.3 vocab\_utils.py.
 }
 \begin{itemize}
-	\item \textbf{feature\_extraction.py:} Contiene la lógica del proceso de extracción de características con Androguard. Es utilizado por la aplicación web para analizar nuevas APKs.
+	\item \textbf{\texttt{feature\_extraction.py}:} Contiene la lógica del proceso de extracción de características con Androguard. Es utilizado por la aplicación web para analizar nuevas APKs.
 	
-	\item \textbf{preprocessing\_utils.py:} Contiene las funciones para preprocesar los datos extraídos (creación de vocabularios, \textit{padding}, etc.), asegurando que el tratamiento de los datos sea consistente en todo el proyecto.
+	\item \textbf{\texttt{preprocessing\_utils.py}:} Contiene las funciones para preprocesar los datos extraídos (creación de vocabularios, \textit{padding}, etc.), asegurando que el tratamiento de los datos sea consistente en todo el proyecto.
 	
-	\item  \textbf{vocab\_utils.py:} Contiene funciones para la generación de los vocabularios empleados en el preprocesamiento.
+	\item  \textbf\texttt{{vocab\_utils.py}:} Contiene funciones para la generación de los vocabularios empleados en el preprocesamiento.
 \end{itemize}
 
 \subsection{Guía de procesos comunes} \label{procesos_comunes}
-A continuación se describen los pasos para ejecutar las tareas más comunes. Se asume que el entorno de desarrollo ya está configurado (ver \ref{entorno_desarrollo}).
+A continuación se describen los pasos para ejecutar las tareas más comunes. Se asume que el entorno de desarrollo ya está configurado (ver sección \ref{entorno_desarrollo}).
 
 \subsubsection{Proceso de creación del \textit{dataset}}
 \begin{enumerate}
@@ -209,6 +217,7 @@ Este es el flujo recomendado para modificar el código o entrenar nuevos modelos
 		streamlit run ./src/app/malware_interpreter_app.py
 	\end{verbatim}
 	
+	\vspace{-1em}
 	Si justo se ha descargado el repositorio la aplicación dará error al intentar acceder a ella puesto que no tendrá modelos que cargar, se han de entrenar primero (ver \ref{procesos_comunes}).
 \end{enumerate}
 
@@ -226,16 +235,19 @@ Este método es el más sencillo para simplemente probar la aplicación final, y
 		cd streamlit_malware_detection_app
 		git lfs pull
 		
-		# Construye la imagen (elegir entre con o sin soporte para GPU)
+		# Construye la imagen (elegir una)
 		docker build -t streamlit-malware-app:cpu .
-		docker build --build-arg BUILD_TYPE=gpu -t streamlit-malware-app:gpu .
+		docker build --build-arg BUILD_TYPE=gpu -t \
+		streamlit-malware-app:gpu .
 	\end{verbatim}
 	
 	\item \textbf{Ejecución:} Lanza el contenedor. La aplicación será accesible en \url{http://localhost:8501}.
 	\begin{verbatim}
-		# Ejecuta el contenedor (elegir en función de si se quiere o no soporte para GPU)
-		docker run --rm -p 8501:8501 streamlit-malware-app:cpu
-		docker run --rm --gpus all -p 8501:8501 streamlit-malware-app:gpu
+		# Ejecuta el contenedor (elegir una)
+		docker run --rm -p 8501:8501 \
+		streamlit-malware-app:cpu
+		docker run --rm --gpus all -p 8501:8501 \
+		streamlit-malware-app:gpu
 	\end{verbatim}
 \end{enumerate}
 
