@@ -162,6 +162,7 @@ En esta sección se detalla la arquitectura del software, tanto del modelo de in
 \subsection*{Arquitectura del modelo}
 El modelo de inteligencia artificial, implementado en PyTorch, sigue una arquitectura modular y flexible, compuesta por dos grandes bloques: el \textit{embedder} y el clasificador.
 
+\newpage
 \begin{verbatim}
 	APKAnalysisModel(
 			(embedder): APKFeatureEmbedder(
@@ -188,9 +189,9 @@ El modelo de inteligencia artificial, implementado en PyTorch, sigue una arquite
 	\item \textbf{APKClassifier (Clasificador):} Este componente es la cabeza del modelo. Por defecto, es una red neuronal de tipo Perceptrón Multicapa (MLP) que toma el vector del \textit{embedder} y, a través de una o más capas ocultas con funciones de activación ReLU y capas de \textit{dropout}, lo procesa para obtener la predicción final en sus dos neuronas de salida.
 \end{itemize}
 
-Una de las claves de este diseño es que la cabeza clasificadora es intercambiable. La salida del \textit{embedder} es un vector de características de alta calidad que puede ser utilizado para entrenar cualquier otro modelo de aprendizaje automático clásico (como RandomForest, XGBoost, SVM, etc.), tratando a la red neuronal simplemente como un potente paso de ingeniería de características.
+Una de las claves de este diseño es que la cabeza clasificadora es intercambiable. La salida del \textit{embedder} es un vector de características de alta calidad que puede ser utilizado para entrenar cualquier otro modelo de aprendizaje automático clásico (como RandomForest, XGBoost, SVM, etc.), tratando a la red neuronal simplemente como un potente paso de ingeniería de características. Una representación de la arquitectura completa del modelo puede verse en la figura \ref{fig:model_arch}.
 
-%\imagen{sequence_model_arch}{Diagrama de la arquitectura modelo de red neruonal.}
+\figuraApaisadaSinMarco{1}{model_arch}{Arquitectura del modelo de red neuronal y los diferentes clasificadores clásicos.}{fig:model_arch}
 
 \subsection{Arquitectura de la aplicación web}
 
