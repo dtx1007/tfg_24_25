@@ -192,10 +192,26 @@ En esta sección se detallan los dos flujos principales para ejecutar el proyect
 \subsection{Entorno de desarrollo (local)} \label{entorno_desarrollo}
 Este es el flujo recomendado para modificar el código o entrenar nuevos modelos.
 \begin{enumerate}
-	\item \textbf{Prerrequisitos:} Asegurarse de tener instalados Python 3.11+, Git y Poetry\footnote{Documentación oficial de Poetry: \url{https://python-poetry.org/docs/}}.
+	\item \textbf{Prerrequisitos:} Asegurarse de tener instalados Python 3.11+, Git, Git LFS y Poetry\footnote{Documentación oficial de Poetry: \url{https://python-poetry.org/docs/}}.
 	
 	\item \textbf{Clonar el repositorio:} Descargar el código fuente desde el repositorio principal.
 	
+	\vspace*{-1em}
+	\begin{verbatim}
+		# Clona el repositorio y descarga los modelos
+		git clone \
+		https://github.com/dtx1007/tfg_24_25
+		cd tfg_24_25
+		git lfs pull
+		
+		# Construye la imagen (elegir una)
+		docker build -t streamlit-malware-app:cpu .
+		docker build --build-arg BUILD_TYPE=gpu -t \
+		streamlit-malware-app:gpu .
+	\end{verbatim}
+	\vspace*{-1em}
+	
+	\newpage
 	\item \textbf{Instalar dependencias:} Navegar a la raíz del proyecto en un terminal y ejecutar uno de los siguientes comandos:
 	
 	\vspace*{-1em}

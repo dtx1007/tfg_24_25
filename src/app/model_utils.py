@@ -1,6 +1,7 @@
 import streamlit as st
-import torch
 import numpy as np
+
+from pathlib import Path
 
 from src.prototypes.torch_apk_analysis_model import (
     extract_embeddings,
@@ -38,6 +39,18 @@ def load_ml_models_from_disk(version=None, base_dir="model_artifacts/ml_models")
         )
         st.success("Classical ML models loaded.")
         return ml_models, ml_metadata
+
+
+# Load umap reducer
+@st.cache_resource
+def load_umap_reducer_from_disk(base_dir: Path | str = "model_artifacts/umap"):
+    with st.spinner("Loading UMAP reducer..."):
+        import joblib
+
+        reducer_path = f"{base_dir}/umap_reducer.pkl"
+        reducer = joblib.load(reducer_path)
+        st.success("UMAP reducer loaded.")
+        return reducer
 
 
 def full_preprocess_and_predict(

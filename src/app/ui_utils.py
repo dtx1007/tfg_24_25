@@ -29,15 +29,13 @@ def plot_umap_projection(
     current_embedding: np.ndarray,
     background_embeddings: np.ndarray,
     background_labels: np.ndarray,
+    umap_reducer: umap.UMAP,
 ):
     """Visualizes embedding space with UMAP, highlighting the current sample."""
     with st.spinner("Reducing dimensionality with UMAP..."):
         try:
             all_data = np.vstack([current_embedding, background_embeddings])
-            reducer = umap.UMAP(
-                n_neighbors=15, min_dist=0.1, n_components=2, random_state=42
-            )
-            embedded = reducer.fit_transform(all_data)
+            embedded = umap_reducer.transform(all_data)
 
             fig, ax = plt.subplots(figsize=(12, 8))
 
